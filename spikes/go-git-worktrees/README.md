@@ -147,3 +147,21 @@ filesystem operations. The risk is acceptable for a developer CLI tool.
 
 All other go-git v6 APIs used (init, commit, branch refs, checkout, status, config) are
 in the stable surface and behave identically to v5.
+
+## Decision: go-git not adopted
+
+After this spike, the project decided to shell out to system `git` instead of using go-git.
+
+**Reasons:**
+- The pre-release API risk and workarounds identified here were not worth the "pure Go" benefit
+- System git is universally available on developer machines and respects credential helpers,
+  SSH agents, and proxy config that go-git silently bypasses
+- All git features needed (`worktree add/list/remove/prune`) are available in git 2.25.1
+  (Ubuntu 20.04 LTS default, well within the support target)
+- `--porcelain` and `--porcelain=v2` output formats provide structured, stable output
+  that does not require fragile text parsing
+- A clean `Runner` interface (see `docs/DESIGN.md`) provides the same testability benefit
+  as go-git's in-memory implementations
+
+This spike was valuable: the constraints and workarounds discovered here directly informed
+the decision. The spike code has been removed; this README is retained as a record.
