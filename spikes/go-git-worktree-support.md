@@ -1,7 +1,5 @@
 # go-git v6 Worktree Spike Results
 
-Spike program: `spikes/go-git-worktrees/main.go`
-
 ## Goal
 
 Verify that `github.com/go-git/go-git/v6` (pre-release) can handle all worktree
