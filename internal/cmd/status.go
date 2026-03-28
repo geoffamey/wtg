@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/state"
@@ -113,10 +114,15 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	)
 
 	results := make([]repoStatusResult, len(sp.Repos))
+	var g errgroup.Group
 	for i, r := range sp.Repos {
-		st, err := runner.Status(r.WorktreePath)
-		results[i] = repoStatusResult{entry: r, st: st, err: err}
+		g.Go(func() error {
+			st, err := runner.Status(r.WorktreePath)
+			results[i] = repoStatusResult{entry: r, st: st, err: err}
+			return nil
+		})
 	}
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	// Render repo rows into a buffer so tabwriter computes column widths across
 	// all repos before we interleave file lines in detailed mode.
