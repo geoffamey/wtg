@@ -25,6 +25,7 @@ func main() {
 			cmd.InitCommand(),
 			cmd.RepoCommand(git.New()),
 			cmd.SpaceCommand(git.New()),
+			cmd.StatusCommand(git.New()),
 		},
 	}
 
