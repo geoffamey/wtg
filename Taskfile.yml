@@ -1,0 +1,16 @@
+version: '3'
+
+tasks:
+  lint:
+    desc: Run golangci-lint
+    cmd: golangci-lint run ./...
+
+  test:
+    desc: Run all tests
+    cmd: go test ./...
+
+  test:coverage:
+    desc: Run all tests with coverage report
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out
