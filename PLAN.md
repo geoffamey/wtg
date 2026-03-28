@@ -5,7 +5,7 @@
 - [x] Package layout and module setup
 - [x] Config types + koanf loading (file, env, flags)
 - [x] `Runner` interface + shell-out implementation (`internal/git/`)
-- [ ] `Runner` integration tests (real git repos in `t.TempDir()`)
+- [x] `Runner` integration tests (real git repos in `t.TempDir()`)
 - [ ] State file types + read/write (`internal/state/`)
 - [ ] Saga implementation + tests (`internal/saga/`)
 - [ ] UI helpers — shared lipgloss styles and output formatting (`internal/ui/`)
