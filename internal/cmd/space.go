@@ -370,7 +370,7 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 		return fmt.Errorf("no repos found")
 	}
 
-	if err := checkBranchConflicts(runner, targets, branch); err != nil {
+	if err := classifyBranchTargets(runner, targets, branch); err != nil {
 		return err
 	}
 
@@ -465,7 +465,7 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 		return err
 	}
 
-	if err := checkBranchConflicts(runner, newTargets, sp.Branch); err != nil {
+	if err := classifyBranchTargets(runner, newTargets, sp.Branch); err != nil {
 		return err
 	}
 
@@ -664,9 +664,11 @@ func buildTargets(rootDir, spacePath string, allPaths, names []string) ([]*repoT
 	return targets, nil
 }
 
-// checkBranchConflicts runs pre-flight branch checks for each target, setting
-// createBranch on each target based on whether the branch already exists.
-func checkBranchConflicts(runner git.Runner, targets []*repoTarget, branch string) error {
+// classifyBranchTargets inspects the branch in each target repo and sets
+// t.createBranch accordingly: true if the branch does not yet exist, false if
+// it exists but is not checked out elsewhere. Returns an error if the branch is
+// already checked out in another worktree, which would cause a git conflict.
+func classifyBranchTargets(runner git.Runner, targets []*repoTarget, branch string) error {
 	for _, t := range targets {
 		exists, err := runner.BranchExists(t.repoPath, branch)
 		if err != nil {
