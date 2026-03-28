@@ -389,6 +389,57 @@ func TestRunSpaceCreate_RollbackPreservesExistingBranch(t *testing.T) {
 	}
 }
 
+// --- nested repos ---
+
+func TestRunSpaceCreate_NestedRepoLayout(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "myorg/api")
+	makeRepo(t, root, "myorg/frontend")
+	cfg := spaceCreateCfg(root, spacesRoot)
+
+	var worktreePaths []string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, worktreePath, _ string, _ bool) error {
+			worktreePaths = append(worktreePaths, worktreePath)
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceCreate: %v", err)
+	}
+
+	spaceRoot := filepath.Join(spacesRoot, "feat")
+	want := []string{
+		filepath.Join(spaceRoot, "myorg", "api"),
+		filepath.Join(spaceRoot, "myorg", "frontend"),
+	}
+	if len(worktreePaths) != len(want) {
+		t.Fatalf("got %d worktree paths, want %d: %v", len(worktreePaths), len(want), worktreePaths)
+	}
+	for i, got := range worktreePaths {
+		if got != want[i] {
+			t.Errorf("worktree[%d]: got %q, want %q", i, got, want[i])
+		}
+	}
+
+	// State should record the same paths.
+	sp, err := state.Load("feat")
+	if err != nil {
+		t.Fatalf("state.Load: %v", err)
+	}
+	for _, repo := range sp.Repos {
+		expected := filepath.Join(spaceRoot, filepath.FromSlash(repo.Name))
+		if repo.WorktreePath != expected {
+			t.Errorf("state WorktreePath for %s: got %q, want %q", repo.Name, repo.WorktreePath, expected)
+		}
+	}
+}
+
 // --- go.work ---
 
 func TestRunSpaceCreate_GoWork(t *testing.T) {
@@ -418,6 +469,38 @@ func TestRunSpaceCreate_GoWork(t *testing.T) {
 	}
 	if strings.Contains(content, "frontend") {
 		t.Errorf("go.work should not reference frontend (no go.mod): %q", content)
+	}
+}
+
+func TestRunSpaceCreate_GoWorkRemovedOnRollback(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	apiPath := makeRepo(t, root, "api")
+	if err := os.WriteFile(filepath.Join(apiPath, "go.mod"),
+		[]byte("module example.com/api\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	cfg := spaceCreateCfg(root, spacesRoot)
+
+	// Make state.Save fail by pointing XDG_DATA_HOME at a regular file so
+	// os.MkdirAll cannot create the state directory beneath it.
+	blockFile := filepath.Join(t.TempDir(), "block")
+	if err := os.WriteFile(blockFile, nil, 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Setenv("XDG_DATA_HOME", blockFile)
+
+	var out bytes.Buffer
+	err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{Name: "feat"}, &out)
+	if err == nil {
+		t.Fatal("expected error when state save fails")
+	}
+
+	// go.work should have been removed by the saga undo.
+	goWorkPath := filepath.Join(spacesRoot, "feat", "go.work")
+	if _, statErr := os.Stat(goWorkPath); statErr == nil {
+		t.Error("go.work should be removed when saga rolls back after state save failure")
 	}
 }
 
