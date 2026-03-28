@@ -249,7 +249,7 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 			return nil
 		})
 	}
-	_ = g.Wait()
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {
@@ -292,7 +292,7 @@ func RunSpaceRebase(runner git.Runner, spaceName string, out io.Writer) error {
 			return nil
 		})
 	}
-	_ = g.Wait()
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {

@@ -172,7 +172,7 @@ func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Write
 			return nil
 		})
 	}
-	_ = g.Wait()
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {
@@ -206,7 +206,7 @@ func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer
 			return nil
 		})
 	}
-	_ = g.Wait()
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {
@@ -321,7 +321,7 @@ func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.
 			return nil
 		})
 	}
-	_ = g.Wait()
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {
