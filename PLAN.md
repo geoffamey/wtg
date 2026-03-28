@@ -32,10 +32,10 @@ Each command includes unit tests (mock `Runner`) in the same session.
 
 ## Phase 4 — Gap closure
 
-- [ ] `wtg status` with no args detects if CWD is inside a workspace and shows that space; otherwise shows summary of all spaces
-- [ ] `wtg status <name>` shows per-repo detail (branch, clean/dirty, ahead/behind) — current impl shows summary row only
-- [ ] `wtg status <name> --detailed` lists individual modified files per repo
-- [ ] `wtg space list` includes repo names alongside count
+- [x] `wtg status` with no args detects if CWD is inside a workspace and shows that space; otherwise shows summary of all spaces
+- [x] `wtg status <name>` shows per-repo detail (branch, clean/dirty, ahead/behind)
+- [x] `wtg status <name> --detailed` lists individual modified files per repo
+- [x] `wtg space list` includes repo names alongside count
 
 ## Phase 5 — Enhancements
 
