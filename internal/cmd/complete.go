@@ -79,9 +79,13 @@ end
 complete -c wtg -f -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from repo space' -a '(wtg _complete spaces 2>/dev/null)'
 complete -c wtg -f -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from sync'   -a '(wtg _complete repos 2>/dev/null)'
 complete -c wtg -f -n '__fish_seen_subcommand_from repo; and __fish_seen_subcommand_from status' -a '(wtg _complete repos 2>/dev/null)'
-complete -c wtg -f -n '__fish_seen_subcommand_from space; and __fish_seen_subcommand_from delete rm' -a '(wtg _complete spaces 2>/dev/null)'
-complete -c wtg -f -n __fish_wtg_space_add_completing_name  -a '(wtg _complete spaces 2>/dev/null)'
-complete -c wtg -f -n __fish_wtg_space_add_completing_repos -a '(wtg _complete repos 2>/dev/null)'
+complete -c wtg -f -n '__fish_seen_subcommand_from space; and __fish_seen_subcommand_from delete rm'   -a '(wtg _complete spaces 2>/dev/null)'
+complete -c wtg -f -n '__fish_seen_subcommand_from space; and __fish_seen_subcommand_from push'      -a '(wtg _complete spaces 2>/dev/null)'
+complete -c wtg -f -n '__fish_seen_subcommand_from space; and __fish_seen_subcommand_from rebase'    -a '(wtg _complete spaces 2>/dev/null)'
+complete -c wtg -f -n '__fish_seen_subcommand_from space; and __fish_seen_subcommand_from path'      -a '(wtg _complete spaces 2>/dev/null)'
+complete -c wtg -f -n '__fish_seen_subcommand_from space; and __fish_seen_subcommand_from exec'      -a '(wtg _complete spaces 2>/dev/null)'
+complete -c wtg -f -n __fish_wtg_space_add_completing_name     -a '(wtg _complete spaces 2>/dev/null)'
+complete -c wtg -f -n __fish_wtg_space_add_completing_repos    -a '(wtg _complete repos 2>/dev/null)'
 complete -c wtg -f -n __fish_wtg_space_create_completing_repos -a '(wtg _complete repos 2>/dev/null)'
 `
 
