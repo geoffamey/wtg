@@ -65,9 +65,51 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 					}, os.Stdout)
 				},
 			},
+			{
+				Name:      "add",
+				Usage:     "add repos to an existing workspace",
+				ArgsUsage: "<name> <repo>...",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 2 {
+						return fmt.Errorf("usage: wtg space add <name> <repo>")
+					}
+					cfg, err := config.Load(c.String("config"))
+					if err != nil {
+						return err
+					}
+					return RunSpaceAdd(cfg, runner, SpaceAddArgs{
+						Name:  c.Args().First(),
+						Repos: c.Args().Tail(),
+					}, os.Stdout)
+				},
+			},
 		},
 	}
 }
+
+// =============================================================================
+// space list
+// =============================================================================
+
+// RunSpaceList prints a table of all spaces sorted by name. Each row shows the
+// space name, branch, workspace path, and number of repos.
+func RunSpaceList(out io.Writer) error {
+	spaces, err := state.List()
+	if err != nil {
+		return fmt.Errorf("list spaces: %w", err)
+	}
+	sort.Slice(spaces, func(i, j int) bool { return spaces[i].Name < spaces[j].Name })
+	tbl := ui.NewTableWriter(out)
+	for _, sp := range spaces {
+		tbl.Row(sp.Name, sp.Branch, sp.Path, fmt.Sprintf("%d repos", len(sp.Repos)))
+	}
+	tbl.Flush()
+	return nil
+}
+
+// =============================================================================
+// space create
+// =============================================================================
 
 // SpaceCreateArgs holds the parsed arguments for RunSpaceCreate.
 type SpaceCreateArgs struct {
@@ -87,7 +129,6 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
 	}
 
-	// Resolve branch and space root path.
 	branch := args.Branch
 	if branch == "" {
 		branch = cfg.Git.BranchPrefix + args.Name
@@ -97,14 +138,12 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 		spacePath = filepath.Join(cfg.Spaces.RootDir, args.Name)
 	}
 
-	// Space must not already exist.
 	if _, err := state.Load(args.Name); err == nil {
 		return fmt.Errorf("space %q already exists", args.Name)
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("check state for %q: %w", args.Name, err)
 	}
 
-	// Discover repos and resolve targets.
 	allPaths, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
 	if err != nil {
 		return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
@@ -119,79 +158,19 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 		return fmt.Errorf("no repos found")
 	}
 
-	// Pre-flight: check branch conflicts per repo.
-	for i, t := range targets {
-		exists, err := runner.BranchExists(t.repoPath, branch)
-		if err != nil {
-			return fmt.Errorf("check branch in %s: %w", t.name, err)
-		}
-		if exists {
-			wts, err := runner.WorktreeList(t.repoPath)
-			if err != nil {
-				return fmt.Errorf("list worktrees in %s: %w", t.name, err)
-			}
-			for _, wt := range wts {
-				if wt.Branch == branch {
-					return fmt.Errorf("branch %q is already checked out in %s (worktree: %s)",
-						branch, t.name, wt.Path)
-				}
-			}
-			targets[i].createBranch = false
-		} else {
-			targets[i].createBranch = true
-		}
+	if err := checkBranchConflicts(runner, targets, branch); err != nil {
+		return err
 	}
 
-	// Determine which repos have a go.mod (checked pre-saga against the main clone).
-	hasGoMod := make([]bool, len(targets))
-	anyGoMod := false
-	for i, t := range targets {
-		if _, err := os.Stat(filepath.Join(t.repoPath, "go.mod")); err == nil {
-			hasGoMod[i] = true
-			anyGoMod = true
-		}
-	}
+	hasGoMod, anyGoMod := detectGoMods(targets)
 
-	// Build saga steps.
 	var steps []saga.Step
-
 	for i := range targets {
-		t := targets[i]
-		steps = append(steps, saga.Step{
-			Name: fmt.Sprintf("create worktree %s", t.name),
-			Do: func(ctx context.Context) error {
-				if err := os.MkdirAll(filepath.Dir(t.worktreePath), 0o755); err != nil {
-					return fmt.Errorf("create parent dir: %w", err)
-				}
-				return runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, t.createBranch)
-			},
-			Undo: func(ctx context.Context) error {
-				if err := runner.WorktreeRemove(t.repoPath, t.worktreePath, true); err != nil {
-					return err
-				}
-				// Only delete the branch if we created it; leave pre-existing branches alone.
-				if t.createBranch {
-					return runner.BranchDelete(t.repoPath, branch, true)
-				}
-				return nil
-			},
-		})
+		steps = append(steps, worktreeStep(runner, targets[i], branch))
 	}
-
+	goWorkPath := filepath.Join(spacePath, "go.work")
 	if anyGoMod {
-		goWorkPath := filepath.Join(spacePath, "go.work")
-		steps = append(steps, saga.Step{
-			Name: "write go.work",
-			Do: func(ctx context.Context) error {
-				return writeGoWork(goWorkPath, spacePath, targets, hasGoMod)
-			},
-			Undo: func(ctx context.Context) error {
-				if err := os.Remove(goWorkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-					return err
-				}
-				return nil
-			},
-		})
+		steps = append(steps, goWorkStep(goWorkPath, spacePath, targets, hasGoMod))
 	}
 
 	savedState := false
@@ -226,12 +205,127 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 	return nil
 }
 
+// =============================================================================
+// space add
+// =============================================================================
+
+// SpaceAddArgs holds the parsed arguments for RunSpaceAdd.
+type SpaceAddArgs struct {
+	Name  string
+	Repos []string // short names of repos to add (required)
+}
+
+// RunSpaceAdd adds one or more repos to an existing workspace by creating
+// worktrees on the space's branch and updating the go.work file and state.
+func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out io.Writer) error {
+	if cfg.Discovery.RootDir == "" {
+		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
+	}
+	if len(args.Repos) == 0 {
+		return fmt.Errorf("no repos specified")
+	}
+
+	sp, err := state.Load(args.Name)
+	if err != nil {
+		return fmt.Errorf("load space %q: %w", args.Name, err)
+	}
+
+	// Reject repos already in the space.
+	existing := make(map[string]bool, len(sp.Repos))
+	for _, r := range sp.Repos {
+		existing[r.Name] = true
+	}
+	for _, name := range args.Repos {
+		if existing[name] {
+			return fmt.Errorf("repo %q is already in space %q", name, args.Name)
+		}
+	}
+
+	allPaths, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
+	if err != nil {
+		return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
+	}
+	sort.Strings(allPaths)
+
+	newTargets, err := buildTargets(cfg.Discovery.RootDir, sp.Path, allPaths, args.Repos)
+	if err != nil {
+		return err
+	}
+
+	if err := checkBranchConflicts(runner, newTargets, sp.Branch); err != nil {
+		return err
+	}
+
+	// Build the full target list (existing + new) for go.work.
+	allTargets := append(targetsFromState(sp), newTargets...)
+	hasGoMod, anyGoMod := detectGoMods(allTargets)
+
+	var steps []saga.Step
+	for i := range newTargets {
+		steps = append(steps, worktreeStep(runner, newTargets[i], sp.Branch))
+	}
+
+	goWorkPath := filepath.Join(sp.Path, "go.work")
+	if anyGoMod {
+		steps = append(steps, goWorkStep(goWorkPath, sp.Path, allTargets, hasGoMod))
+	}
+
+	oldState := *sp
+	steps = append(steps, saga.Step{
+		Name: "save state",
+		Do: func(ctx context.Context) error {
+			updated := oldState
+			updated.GoWorkspace = anyGoMod
+			for _, t := range newTargets {
+				updated.Repos = append(updated.Repos, state.RepoEntry{
+					Name:         t.name,
+					RepoPath:     t.repoPath,
+					WorktreePath: t.worktreePath,
+				})
+			}
+			return state.Save(&updated)
+		},
+		Undo: func(ctx context.Context) error {
+			return state.Save(&oldState)
+		},
+	})
+
+	if err := saga.Run(context.Background(), steps); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "%s added to space %q\n", ui.SymOK, args.Name)
+	tbl := ui.NewTableWriter(out)
+	for _, t := range newTargets {
+		tbl.Row("  "+t.name, t.worktreePath)
+	}
+	tbl.Flush()
+	return nil
+}
+
+// =============================================================================
+// shared helpers
+// =============================================================================
+
 // repoTarget holds resolved paths for one repo's participation in a space.
 type repoTarget struct {
 	name         string // short name relative to discovery.root_dir
 	repoPath     string // absolute path to the main clone
 	worktreePath string // absolute path for the new worktree
 	createBranch bool   // whether to create a new branch (set during pre-flight)
+}
+
+// targetsFromState converts existing state repo entries back into repoTargets.
+func targetsFromState(sp *state.Space) []*repoTarget {
+	targets := make([]*repoTarget, len(sp.Repos))
+	for i, r := range sp.Repos {
+		targets[i] = &repoTarget{
+			name:         r.Name,
+			repoPath:     r.RepoPath,
+			worktreePath: r.WorktreePath,
+		}
+	}
+	return targets
 }
 
 // buildTargets resolves the set of repos to include in a space.
@@ -270,6 +364,90 @@ func buildTargets(rootDir, spacePath string, allPaths, names []string) ([]*repoT
 	return targets, nil
 }
 
+// checkBranchConflicts runs pre-flight branch checks for each target, setting
+// createBranch on each target based on whether the branch already exists.
+func checkBranchConflicts(runner git.Runner, targets []*repoTarget, branch string) error {
+	for i, t := range targets {
+		exists, err := runner.BranchExists(t.repoPath, branch)
+		if err != nil {
+			return fmt.Errorf("check branch in %s: %w", t.name, err)
+		}
+		if exists {
+			wts, err := runner.WorktreeList(t.repoPath)
+			if err != nil {
+				return fmt.Errorf("list worktrees in %s: %w", t.name, err)
+			}
+			for _, wt := range wts {
+				if wt.Branch == branch {
+					return fmt.Errorf("branch %q is already checked out in %s (worktree: %s)",
+						branch, t.name, wt.Path)
+				}
+			}
+			targets[i].createBranch = false
+		} else {
+			targets[i].createBranch = true
+		}
+	}
+	return nil
+}
+
+// detectGoMods reports which targets have a go.mod in their main clone.
+func detectGoMods(targets []*repoTarget) (hasGoMod []bool, anyGoMod bool) {
+	hasGoMod = make([]bool, len(targets))
+	for i, t := range targets {
+		if _, err := os.Stat(filepath.Join(t.repoPath, "go.mod")); err == nil {
+			hasGoMod[i] = true
+			anyGoMod = true
+		}
+	}
+	return
+}
+
+// worktreeStep returns a saga.Step that creates a linked worktree and undoes it
+// on rollback (also deleting the branch if it was newly created).
+func worktreeStep(runner git.Runner, t *repoTarget, branch string) saga.Step {
+	return saga.Step{
+		Name: fmt.Sprintf("create worktree %s", t.name),
+		Do: func(ctx context.Context) error {
+			if err := os.MkdirAll(filepath.Dir(t.worktreePath), 0o755); err != nil {
+				return fmt.Errorf("create parent dir: %w", err)
+			}
+			return runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, t.createBranch)
+		},
+		Undo: func(ctx context.Context) error {
+			if err := runner.WorktreeRemove(t.repoPath, t.worktreePath, true); err != nil {
+				return err
+			}
+			if t.createBranch {
+				return runner.BranchDelete(t.repoPath, branch, true)
+			}
+			return nil
+		},
+	}
+}
+
+// goWorkStep returns a saga.Step that writes a go.work and restores the prior
+// content (or removes the file) on rollback.
+func goWorkStep(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool) saga.Step {
+	// Capture existing content before the saga runs so undo can restore it.
+	oldContent, _ := os.ReadFile(goWorkPath)
+	return saga.Step{
+		Name: "write go.work",
+		Do: func(ctx context.Context) error {
+			return writeGoWork(goWorkPath, spacePath, targets, hasGoMod)
+		},
+		Undo: func(ctx context.Context) error {
+			if oldContent != nil {
+				return os.WriteFile(goWorkPath, oldContent, 0o644)
+			}
+			if err := os.Remove(goWorkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
 // writeGoWork writes a go.work file at goWorkPath with a use directive for
 // each repo that has a go.mod. hasGoMod[i] corresponds to targets[i].
 func writeGoWork(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool) error {
@@ -296,23 +474,6 @@ func writeGoWork(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod [
 	b.WriteString(")\n")
 
 	return os.WriteFile(goWorkPath, []byte(b.String()), 0o644)
-}
-
-// RunSpaceList prints a table of all spaces sorted by name. Each row shows the
-// space name, branch, workspace path, and number of repos.
-func RunSpaceList(out io.Writer) error {
-	spaces, err := state.List()
-	if err != nil {
-		return fmt.Errorf("list spaces: %w", err)
-	}
-	sort.Slice(spaces, func(i, j int) bool { return spaces[i].Name < spaces[j].Name })
-	tbl := ui.NewTableWriter(out)
-	for _, sp := range spaces {
-		repos := fmt.Sprintf("%d repos", len(sp.Repos))
-		tbl.Row(sp.Name, sp.Branch, sp.Path, repos)
-	}
-	tbl.Flush()
-	return nil
 }
 
 // buildSpaceState constructs the state.Space value to persist.
