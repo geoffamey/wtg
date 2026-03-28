@@ -552,8 +552,8 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 		}
 	}
 
-	forceRemove := len(warnings) > 0
-	if forceRemove {
+	needsForce := len(warnings) > 0
+	if needsForce {
 		for _, w := range warnings {
 			fmt.Fprintf(out, "  %s %s\n", ui.SymWarn, w)
 		}
@@ -573,7 +573,7 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 	hadError := false
 	tbl := ui.NewTableWriter(out)
 	for _, r := range sp.Repos {
-		sym, msg := deleteOne(runner, r, sp.Branch, args.DeleteBranch, args.ForceBranch, forceRemove)
+		sym, msg := deleteOne(runner, r, sp.Branch, args.DeleteBranch, args.ForceBranch, needsForce)
 		tbl.Row(r.Name, sym+" "+msg)
 		if sym == ui.SymFail {
 			hadError = true
