@@ -47,6 +47,18 @@ func RepoCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
+				Name:      "fetch",
+				Usage:     "fetch from origin for all repos (no fast-forward)",
+				ArgsUsage: "[<repo>...]",
+				Action: func(c *cli.Context) error {
+					cfg, err := config.Load(c.String("config"))
+					if err != nil {
+						return err
+					}
+					return RunFetch(cfg, runner, c.Args().Slice(), os.Stdout)
+				},
+			},
+			{
 				Name:      "sync",
 				Usage:     "fetch and fast-forward repos to origin's default branch",
 				ArgsUsage: "[<repo>...]",
@@ -124,6 +136,61 @@ func scanDir(dir string, maxDepth, depth int) ([]string, error) {
 func isGitRepo(path string) bool {
 	_, err := os.Stat(filepath.Join(path, ".git"))
 	return err == nil
+}
+
+// RunFetch fetches from origin for each repo without fast-forwarding. If args
+// is empty, all discovered repos are fetched. Otherwise args are short names
+// (relative to discovery.root_dir) to fetch.
+func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Writer) error {
+	if cfg.Discovery.RootDir == "" {
+		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
+	}
+
+	var paths []string
+	if len(args) == 0 {
+		discovered, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
+		if err != nil {
+			return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
+		}
+		paths = discovered
+		sort.Strings(paths)
+	} else {
+		for _, name := range args {
+			p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
+			if err != nil {
+				return err
+			}
+			paths = append(paths, p)
+		}
+	}
+
+	type fetchResult struct {
+		name string
+		sym  string
+		msg  string
+	}
+	results := make([]fetchResult, len(paths))
+
+	var g errgroup.Group
+	for i, p := range paths {
+		g.Go(func() error {
+			name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+			if err := runner.Fetch(p); err != nil {
+				results[i] = fetchResult{name, ui.SymFail, err.Error()}
+			} else {
+				results[i] = fetchResult{name, ui.SymOK, "fetched"}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	tbl := ui.NewTableWriter(out)
+	for _, r := range results {
+		tbl.Row(r.name, r.sym+" "+r.msg)
+	}
+	tbl.Flush()
+	return nil
 }
 
 // RunSync fetches and fast-forwards each repo's default branch. If args is
