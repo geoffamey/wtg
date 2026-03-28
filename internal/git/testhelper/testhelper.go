@@ -54,7 +54,6 @@ func InitWithRemote(t *testing.T) (local *Repo, remote *Repo) {
 	seed.WriteFile("README.md", "# test\n")
 	seed.GitCmd("add", ".")
 	seed.GitCmd("commit", "-m", "initial commit")
-	seed.GitCmd("push", "origin", "main")
 	seed.GitCmd("push", "--set-upstream", "origin", "main")
 
 	// Clone into the local repo dir.
