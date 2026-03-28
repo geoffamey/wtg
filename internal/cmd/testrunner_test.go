@@ -22,6 +22,7 @@ type testRunner struct {
 	fetchFn          func(repoPath string) error
 	fastForwardFn    func(repoPath, branch string) error
 	pushFn           func(repoPath, branch string) error
+	rebaseFn         func(repoPath, onto string) error
 	remoteURLFn      func(repoPath, remote string) (string, error)
 }
 
@@ -107,6 +108,13 @@ func (r *testRunner) Push(repoPath, branch string) error {
 		panic(fmt.Sprintf("unexpected Push(%q, %q)", repoPath, branch))
 	}
 	return r.pushFn(repoPath, branch)
+}
+
+func (r *testRunner) Rebase(repoPath, onto string) error {
+	if r.rebaseFn == nil {
+		panic(fmt.Sprintf("unexpected Rebase(%q, %q)", repoPath, onto))
+	}
+	return r.rebaseFn(repoPath, onto)
 }
 
 func (r *testRunner) RemoteURL(repoPath, remote string) (string, error) {

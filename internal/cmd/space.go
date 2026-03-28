@@ -138,6 +138,21 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
+				Name:      "rebase",
+				Usage:     "rebase all worktrees in a space onto origin's default branch",
+				ArgsUsage: "<name>",
+				Action: func(c *cli.Context) error {
+					if c.NArg() == 0 {
+						return fmt.Errorf("missing required argument: <name>")
+					}
+					cfg, err := config.Load(c.String("config"))
+					if err != nil {
+						return err
+					}
+					return RunSpaceRebase(cfg, runner, c.Args().First(), os.Stdout)
+				},
+			},
+			{
 				Name:      "add",
 				Usage:     "add repos to an existing workspace",
 				ArgsUsage: "<name> <repo>...",
@@ -239,6 +254,54 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 				results[i] = pushResult{r.Name, ui.SymFail, err.Error()}
 			} else {
 				results[i] = pushResult{r.Name, ui.SymOK, "pushed " + sp.Branch}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	tbl := ui.NewTableWriter(out)
+	for _, r := range results {
+		tbl.Row(r.name, r.sym+" "+r.msg)
+	}
+	tbl.Flush()
+	return nil
+}
+
+// =============================================================================
+// space rebase
+// =============================================================================
+
+// RunSpaceRebase fetches origin and rebases each worktree in the named space
+// onto origin's default branch, in parallel. Repos where rebase fails are
+// reported individually; the command itself returns nil so the caller can see
+// the full picture before acting.
+func RunSpaceRebase(cfg *config.Config, runner git.Runner, spaceName string, out io.Writer) error {
+	sp, err := state.Load(spaceName)
+	if err != nil {
+		return fmt.Errorf("load space %q: %w", spaceName, err)
+	}
+
+	type rebaseResult struct {
+		name string
+		sym  string
+		msg  string
+	}
+	results := make([]rebaseResult, len(sp.Repos))
+
+	var g errgroup.Group
+	for i, r := range sp.Repos {
+		g.Go(func() error {
+			defaultBranch, err := runner.DefaultBranch(r.RepoPath)
+			if err != nil {
+				results[i] = rebaseResult{r.Name, ui.SymFail, fmt.Sprintf("default branch: %v", err)}
+				return nil
+			}
+			onto := "origin/" + defaultBranch
+			if err := runner.Rebase(r.WorktreePath, onto); err != nil {
+				results[i] = rebaseResult{r.Name, ui.SymFail, err.Error()}
+			} else {
+				results[i] = rebaseResult{r.Name, ui.SymOK, "rebased onto " + onto}
 			}
 			return nil
 		})

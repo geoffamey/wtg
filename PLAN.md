@@ -44,4 +44,4 @@ Each command includes unit tests (mock `Runner`) in the same session.
 - [x] `wtg space exec <name> <cmd>` — run a shell command in each worktree of a space
 - [x] `wtg space push <name>` — push all branches in a space to origin
 - [x] `--base <branch>` flag on `wtg space create` — branch from something other than the default branch
-- [ ] `wtg space rebase <name>` — rebase all worktrees onto the updated default branch
+- [x] `wtg space rebase <name>` — rebase all worktrees onto the updated default branch

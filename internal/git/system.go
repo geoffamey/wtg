@@ -177,6 +177,11 @@ func (r *SystemRunner) Push(repoPath, branch string) error {
 	return err
 }
 
+func (r *SystemRunner) Rebase(repoPath, onto string) error {
+	_, err := r.run(repoPath, "rebase", onto)
+	return err
+}
+
 // --- Info ---
 
 func (r *SystemRunner) RemoteURL(repoPath, remote string) (string, error) {

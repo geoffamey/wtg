@@ -55,6 +55,7 @@ type Runner interface {
 	Fetch(repoPath string) error
 	FastForward(repoPath, branch string) error
 	Push(repoPath, branch string) error
+	Rebase(repoPath, onto string) error
 
 	// Info
 	RemoteURL(repoPath, remote string) (string, error)
