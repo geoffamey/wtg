@@ -110,7 +110,7 @@ func TestRunSpaceCreate_SpaceAlreadyExists(t *testing.T) {
 	isolateState(t)
 	makeRepo(t, root, "api")
 	cfg := spaceCreateCfg(root, t.TempDir())
-	if err := state.Save(&state.Space{Name: "feat", Path: "/tmp/feat", Branch: "feat"}); err != nil {
+	if err := state.Save(&state.Space{Name: "feat", Path: t.TempDir(), Branch: "feat"}); err != nil {
 		t.Fatalf("state.Save: %v", err)
 	}
 	var out bytes.Buffer
