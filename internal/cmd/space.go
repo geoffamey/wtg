@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -63,6 +64,32 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 						Path:   c.String("path"),
 						Repos:  c.Args().Tail(),
 					}, os.Stdout)
+				},
+			},
+			{
+				Name:      "delete",
+				Aliases:   []string{"rm"},
+				Usage:     "remove a workspace's worktrees and optionally delete its branches",
+				ArgsUsage: "<name>",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "d",
+						Usage: "delete branch if fully merged into upstream",
+					},
+					&cli.BoolFlag{
+						Name:  "D",
+						Usage: "force-delete branch regardless of merge state",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					if c.NArg() == 0 {
+						return fmt.Errorf("missing required argument: <name>")
+					}
+					return RunSpaceDelete(runner, SpaceDeleteArgs{
+						Name:         c.Args().First(),
+						DeleteBranch: c.Bool("d"),
+						ForceBranch:  c.Bool("D"),
+					}, os.Stdin, os.Stdout)
 				},
 			},
 			{
@@ -301,6 +328,88 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 	}
 	tbl.Flush()
 	return nil
+}
+
+// =============================================================================
+// space delete
+// =============================================================================
+
+// SpaceDeleteArgs holds the parsed arguments for RunSpaceDelete.
+type SpaceDeleteArgs struct {
+	Name         string
+	DeleteBranch bool // -d: delete branch if fully merged
+	ForceBranch  bool // -D: force-delete branch regardless of merge state
+}
+
+// RunSpaceDelete removes all worktrees belonging to a space. If -d or -D is
+// set, branches are also deleted. Prompts the user when uncommitted changes or
+// unpushed commits are detected; only deletes state once all removals succeed.
+func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out io.Writer) error {
+	sp, err := state.Load(args.Name)
+	if err != nil {
+		return fmt.Errorf("load space %q: %w", args.Name, err)
+	}
+
+	// Pre-flight: gather warnings about uncommitted or unpushed work.
+	var warnings []string
+	for _, r := range sp.Repos {
+		st, err := runner.Status(r.WorktreePath)
+		if err != nil {
+			continue // worktree may have been externally deleted; skip
+		}
+		if len(st.Files) > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s: has uncommitted changes", r.Name))
+		}
+		if st.Ahead > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s: has %d unpushed commit(s)", r.Name, st.Ahead))
+		}
+	}
+
+	forceRemove := len(warnings) > 0
+	if forceRemove {
+		for _, w := range warnings {
+			fmt.Fprintf(out, "  %s %s\n", ui.SymWarn, w)
+		}
+		ok, err := confirm(bufio.NewReader(in), out, "Delete anyway?")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+	}
+
+	hadError := false
+	tbl := ui.NewTableWriter(out)
+	for _, r := range sp.Repos {
+		sym, msg := deleteOne(runner, r, sp.Branch, args.DeleteBranch, args.ForceBranch, forceRemove)
+		tbl.Row(r.Name, sym+" "+msg)
+		if sym == ui.SymFail {
+			hadError = true
+		}
+	}
+	tbl.Flush()
+
+	if hadError {
+		return fmt.Errorf("some worktrees could not be removed; space %q not deleted from state", args.Name)
+	}
+	return state.Delete(args.Name)
+}
+
+// deleteOne removes the worktree for one repo and optionally deletes its branch.
+// force causes WorktreeRemove to bypass git's dirty-check (used when the user
+// has already confirmed they want to proceed despite uncommitted changes).
+func deleteOne(runner git.Runner, r state.RepoEntry, branch string, deleteBranch, forceBranch, force bool) (sym, msg string) {
+	if err := runner.WorktreeRemove(r.RepoPath, r.WorktreePath, force); err != nil {
+		return ui.SymFail, fmt.Sprintf("remove worktree: %v", err)
+	}
+	if !deleteBranch && !forceBranch {
+		return ui.SymOK, "worktree removed"
+	}
+	if err := runner.BranchDelete(r.RepoPath, branch, forceBranch); err != nil {
+		return ui.SymWarn, fmt.Sprintf("worktree removed, branch not deleted: %v", err)
+	}
+	return ui.SymOK, "worktree removed, branch deleted"
 }
 
 // =============================================================================
