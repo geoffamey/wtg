@@ -667,7 +667,7 @@ func buildTargets(rootDir, spacePath string, allPaths, names []string) ([]*repoT
 // checkBranchConflicts runs pre-flight branch checks for each target, setting
 // createBranch on each target based on whether the branch already exists.
 func checkBranchConflicts(runner git.Runner, targets []*repoTarget, branch string) error {
-	for i, t := range targets {
+	for _, t := range targets {
 		exists, err := runner.BranchExists(t.repoPath, branch)
 		if err != nil {
 			return fmt.Errorf("check branch in %s: %w", t.name, err)
@@ -683,9 +683,9 @@ func checkBranchConflicts(runner git.Runner, targets []*repoTarget, branch strin
 						branch, t.name, wt.Path)
 				}
 			}
-			targets[i].createBranch = false
+			t.createBranch = false
 		} else {
-			targets[i].createBranch = true
+			t.createBranch = true
 		}
 	}
 	return nil
