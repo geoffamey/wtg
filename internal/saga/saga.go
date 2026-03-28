@@ -7,7 +7,6 @@ package saga
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -49,13 +48,3 @@ func Run(ctx context.Context, steps []Step) error {
 	return nil
 }
 
-// CompensationError aggregates one or more errors that occurred during Undo.
-// It is not returned by Run itself, but is useful in tests that need to
-// inspect compensation failures directly.
-type CompensationError struct {
-	Errs []error
-}
-
-func (e *CompensationError) Error() string {
-	return fmt.Sprintf("%d compensation error(s): %v", len(e.Errs), errors.Join(e.Errs...))
-}

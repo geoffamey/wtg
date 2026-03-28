@@ -1,8 +1,36 @@
 package git
 
 import (
+	"strings"
 	"testing"
 )
+
+// --- runError ---
+
+func TestRunError_WithStderr(t *testing.T) {
+	e := &runError{args: []string{"status"}, exitCode: 128, stderr: "  fatal: not a git repo  "}
+	got := e.Error()
+	if !strings.Contains(got, "git status") {
+		t.Errorf("missing command: %q", got)
+	}
+	if !strings.Contains(got, "exit 128") {
+		t.Errorf("missing exit code: %q", got)
+	}
+	if !strings.Contains(got, "fatal: not a git repo") {
+		t.Errorf("missing stderr: %q", got)
+	}
+}
+
+func TestRunError_NoStderr(t *testing.T) {
+	e := &runError{args: []string{"fetch", "origin"}, exitCode: 1, stderr: ""}
+	got := e.Error()
+	if !strings.Contains(got, "git fetch origin") {
+		t.Errorf("missing command: %q", got)
+	}
+	if strings.Contains(got, ":  ") {
+		t.Errorf("should not have trailing colon+space with empty stderr: %q", got)
+	}
+}
 
 // --- parseWorktreeList ---
 

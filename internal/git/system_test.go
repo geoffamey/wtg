@@ -83,6 +83,25 @@ func TestWorktreeRemove(t *testing.T) {
 	}
 }
 
+func TestWorktreeRemove_Force(t *testing.T) {
+	repo := testhelper.Init(t)
+	r := runner()
+
+	wtPath := filepath.Join(t.TempDir(), "wt")
+	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", true); err != nil {
+		t.Fatalf("WorktreeAdd: %v", err)
+	}
+	// Write an untracked file to make the worktree dirty, requiring --force.
+	testhelper.RepoAt(t, wtPath).WriteFile("dirty.go", "package main\n")
+
+	if err := r.WorktreeRemove(repo.Path, wtPath, true); err != nil {
+		t.Fatalf("WorktreeRemove(force): %v", err)
+	}
+	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
+		t.Error("worktree directory still exists after force remove")
+	}
+}
+
 func TestWorktreeList_MainWorktree(t *testing.T) {
 	repo := testhelper.Init(t)
 	wts, err := runner().WorktreeList(repo.Path)
@@ -142,6 +161,37 @@ func TestBranchDelete(t *testing.T) {
 	}
 	if exists {
 		t.Error("branch still exists after delete")
+	}
+}
+
+func TestBranchDelete_Force(t *testing.T) {
+	repo := testhelper.Init(t)
+	r := runner()
+
+	// Add a commit on a worktree so the branch is unmerged, requiring -D.
+	wtPath := filepath.Join(t.TempDir(), "wt")
+	if err := r.WorktreeAdd(repo.Path, wtPath, "unmerged", true); err != nil {
+		t.Fatalf("WorktreeAdd: %v", err)
+	}
+	testhelper.RepoAt(t, wtPath).Commit("unmerged commit")
+	if err := r.WorktreeRemove(repo.Path, wtPath, false); err != nil {
+		t.Fatalf("WorktreeRemove: %v", err)
+	}
+
+	// Safe delete should fail (unmerged).
+	if err := r.BranchDelete(repo.Path, "unmerged", false); err == nil {
+		t.Fatal("expected error for unmerged branch with -d")
+	}
+	// Force delete should succeed.
+	if err := r.BranchDelete(repo.Path, "unmerged", true); err != nil {
+		t.Fatalf("BranchDelete(force): %v", err)
+	}
+	exists, err := r.BranchExists(repo.Path, "unmerged")
+	if err != nil {
+		t.Fatalf("BranchExists: %v", err)
+	}
+	if exists {
+		t.Error("branch still exists after force delete")
 	}
 }
 

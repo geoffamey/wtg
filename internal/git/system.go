@@ -104,8 +104,10 @@ func (r *SystemRunner) WorktreeRepair(repoPath string, paths ...string) error {
 func (r *SystemRunner) BranchExists(repoPath, branch string) (bool, error) {
 	_, err := r.run(repoPath, "rev-parse", "--verify", "refs/heads/"+branch)
 	if err != nil {
-		if exitCode(err) != 0 {
-			return false, nil // ref not found
+		// git exits 128 when the ref does not exist. Any other code (including
+		// -1 for "git failed to start") is a real error we should surface.
+		if exitCode(err) == 128 {
+			return false, nil
 		}
 		return false, err
 	}

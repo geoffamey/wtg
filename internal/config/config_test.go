@@ -124,6 +124,37 @@ func TestLoad_MissingFile_NotAnError(t *testing.T) {
 	}
 }
 
+func TestDefaultPath_XDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
+	if got := DefaultPath(); got != "/custom/config/wtg/config.yaml" {
+		t.Errorf("DefaultPath: got %q", got)
+	}
+}
+
+func TestDefaultPath_FallbackToHome(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
+	got := DefaultPath()
+	if got == "" {
+		t.Error("DefaultPath should not be empty")
+	}
+	if filepath.Base(got) != "config.yaml" {
+		t.Errorf("DefaultPath should end in config.yaml, got %q", got)
+	}
+}
+
+func TestLoad_UsesDefaultPath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	// No file written — should succeed with defaults.
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load with empty path: %v", err)
+	}
+	if cfg.Discovery.MaxDepth != 2 {
+		t.Errorf("MaxDepth: got %d, want 2", cfg.Discovery.MaxDepth)
+	}
+}
+
 // writeConfig writes YAML content to a temp file and returns its path.
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()
