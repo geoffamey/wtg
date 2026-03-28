@@ -23,10 +23,10 @@ func runInitWith(t *testing.T, configPath, input string) (string, error) {
 func TestInit_WritesConfig(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "wtg", "config.yaml")
 	input := strings.Join([]string{
-		"~/myrepos",   // discovery root
-		"3",           // max scan depth
-		"~/myspaces",  // workspace root
-		"geoff/",      // branch prefix
+		"~/myrepos",  // discovery root
+		"3",          // max scan depth
+		"~/myspaces", // workspace root
+		"geoff/",     // branch prefix
 	}, "\n") + "\n"
 
 	out, err := runInitWith(t, cfgPath, input)

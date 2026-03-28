@@ -59,8 +59,8 @@ func TestDiscoverRepoPaths_Nested(t *testing.T) {
 
 func TestDiscoverRepoPaths_MaxDepthRespected(t *testing.T) {
 	root := t.TempDir()
-	makeRepo(t, root, "shallow")       // depth 1 — included at maxDepth=1
-	makeRepo(t, root, "org/deep")      // depth 2 — excluded at maxDepth=1
+	makeRepo(t, root, "shallow")  // depth 1 — included at maxDepth=1
+	makeRepo(t, root, "org/deep") // depth 2 — excluded at maxDepth=1
 
 	paths, err := discoverRepoPaths(root, 1)
 	if err != nil {

@@ -16,8 +16,8 @@ import (
 // Space holds the persisted metadata for a workspace.
 type Space struct {
 	Name        string      `yaml:"name"`
-	Path        string      `yaml:"path"`         // absolute path to the workspace root
-	Branch      string      `yaml:"branch"`       // branch shared across all repos
+	Path        string      `yaml:"path"`   // absolute path to the workspace root
+	Branch      string      `yaml:"branch"` // branch shared across all repos
 	CreatedAt   time.Time   `yaml:"created_at"`
 	Repos       []RepoEntry `yaml:"repos"`
 	GoWorkspace bool        `yaml:"go_workspace"` // whether a go.work was written
