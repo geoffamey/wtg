@@ -87,7 +87,7 @@ Remove a space's worktrees. Prompts for confirmation if any worktree has uncommi
 | `-d` | Delete branches fully merged into upstream |
 | `-D` | Force-delete branches |
 
-### `wtg status [<name>]`
+### `wtg status [<name>] [--detailed]`
 
 Show workspace status.
 
@@ -106,6 +106,17 @@ Space view (one row per repo):
 myfeature   geoff/myfeature   ~/workspaces/myfeature   3 repos
   api       [geoff/myfeature]  ✓ clean     ↑2 ↓0
   frontend  [geoff/myfeature]  ✗ 3 modified, 1 untracked
+  payments  [geoff/myfeature]  ✓ clean     ↑0 ↓0
+```
+
+Detailed view (`--detailed` — lists modified files per repo):
+```
+myfeature   geoff/myfeature   ~/workspaces/myfeature   3 repos
+  api       [geoff/myfeature]  ✓ clean     ↑2 ↓0
+  frontend  [geoff/myfeature]  ✗ 3 modified, 1 untracked
+    M  src/handler.go
+    M  src/middleware.go
+    ?? src/newfile.go
   payments  [geoff/myfeature]  ✓ clean     ↑0 ↓0
 ```
 
