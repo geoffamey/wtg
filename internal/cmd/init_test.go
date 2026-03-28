@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,11 +10,19 @@ import (
 	"github.com/geoffamey/wtg/internal/config"
 )
 
-// runInit is a helper that feeds input lines to RunInit and captures output.
+// runInitWith is a helper that feeds input lines to RunInit and captures output.
 func runInitWith(t *testing.T, configPath, input string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	err := RunInit(configPath, strings.NewReader(input), &out)
+	err := RunInit(configPath, strings.NewReader(input), &out, false)
+	return out.String(), err
+}
+
+// runInitDefaults runs RunInit with --defaults mode.
+func runInitDefaults(t *testing.T, configPath string) (string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	err := RunInit(configPath, strings.NewReader(""), &out, true)
 	return out.String(), err
 }
 
@@ -137,15 +143,44 @@ func TestInit_ExistingConfig_Decline(t *testing.T) {
 	}
 }
 
-func TestInit_MissingDiscoveryRoot(t *testing.T) {
+func TestInit_DefaultDiscoveryRoot(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
-	// Empty discovery root → error.
-	_, err := runInitWith(t, cfgPath, "\n")
-	if err == nil {
-		t.Fatal("expected error for empty discovery root")
+	// Empty discovery root → use default (~/).
+	input := "\n2\n~/workspaces\n\n"
+
+	_, err := runInitWith(t, cfgPath, input)
+	if err != nil {
+		t.Fatalf("RunInit: %v", err)
 	}
-	if _, statErr := os.Stat(cfgPath); !errors.Is(statErr, fs.ErrNotExist) {
-		t.Error("config file should not have been created")
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	if cfg.Discovery.RootDir != home {
+		t.Errorf("Discovery.RootDir: got %q, want %q", cfg.Discovery.RootDir, home)
+	}
+}
+
+func TestInit_DefaultSpacesRoot(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	// Empty spaces root → use default (~/spaces).
+	input := "~/repos\n2\n\n\n"
+
+	_, err := runInitWith(t, cfgPath, input)
+	if err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	want := filepath.Join(home, "spaces")
+	if cfg.Spaces.RootDir != want {
+		t.Errorf("Spaces.RootDir: got %q, want %q", cfg.Spaces.RootDir, want)
 	}
 }
 
@@ -167,11 +202,48 @@ func TestInit_ZeroMaxDepth(t *testing.T) {
 	}
 }
 
-func TestInit_MissingSpacesRoot(t *testing.T) {
+func TestInit_Defaults(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "wtg", "config.yaml")
+
+	out, err := runInitDefaults(t, cfgPath)
+	if err != nil {
+		t.Fatalf("RunInit --defaults: %v", err)
+	}
+	if !strings.Contains(out, "Config written") {
+		t.Errorf("expected success message, got: %q", out)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	if cfg.Discovery.RootDir != home {
+		t.Errorf("Discovery.RootDir: got %q, want %q", cfg.Discovery.RootDir, home)
+	}
+	if cfg.Discovery.MaxDepth != 2 {
+		t.Errorf("MaxDepth: got %d, want 2", cfg.Discovery.MaxDepth)
+	}
+	if cfg.Spaces.RootDir != filepath.Join(home, "spaces") {
+		t.Errorf("Spaces.RootDir: got %q, want %q", cfg.Spaces.RootDir, filepath.Join(home, "spaces"))
+	}
+	if cfg.Git.BranchPrefix != "" {
+		t.Errorf("BranchPrefix: got %q, want empty", cfg.Git.BranchPrefix)
+	}
+}
+
+func TestInit_Defaults_OverwritesExistingConfig(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
-	input := "~/repos\n2\n\n" // empty spaces root
-	_, err := runInitWith(t, cfgPath, input)
-	if err == nil {
-		t.Fatal("expected error for empty spaces root")
+	if err := os.WriteFile(cfgPath, []byte("existing: true\n"), 0o644); err != nil {
+		t.Fatalf("write placeholder: %v", err)
+	}
+
+	_, err := runInitDefaults(t, cfgPath)
+	if err != nil {
+		t.Fatalf("RunInit --defaults: %v", err)
+	}
+	// Verify the file was overwritten with valid config.
+	if _, err := config.Load(cfgPath); err != nil {
+		t.Errorf("config.Load after defaults overwrite: %v", err)
 	}
 }

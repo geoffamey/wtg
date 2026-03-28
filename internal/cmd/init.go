@@ -20,23 +20,37 @@ func InitCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "init",
 		Usage: "interactive setup wizard — creates the wtg config file",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "defaults",
+				Usage: "accept all defaults without prompting",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			cfgPath := cmd.String("config")
 			if cfgPath == "" {
 				cfgPath = config.DefaultPath()
 			}
-			return RunInit(cfgPath, os.Stdin, os.Stdout)
+			return RunInit(cfgPath, os.Stdin, os.Stdout, cmd.Bool("defaults"))
 		},
 	}
 }
 
 // RunInit runs the init wizard, reading prompts from in and writing output to out.
+// When useDefaults is true all prompts are skipped and defaults are accepted.
 // Keeping IO injectable makes it straightforward to test.
-func RunInit(configPath string, in io.Reader, out io.Writer) error {
+func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) error {
 	r := bufio.NewReader(in)
 
-	// If a config already exists, confirm before overwriting.
-	if _, err := os.Stat(configPath); err == nil {
+	const (
+		defaultDiscoveryRoot = "~/"
+		defaultMaxDepth      = "2"
+		defaultSpacesRoot    = "~/spaces"
+		defaultBranchPrefix  = ""
+	)
+
+	// If a config already exists, confirm before overwriting (skip in defaults mode).
+	if _, err := os.Stat(configPath); err == nil && !useDefaults {
 		fmt.Fprintf(out, "Config already exists at %s\n", configPath)
 		ok, err := confirm(r, out, "Overwrite?")
 		if err != nil {
@@ -48,34 +62,44 @@ func RunInit(configPath string, in io.Reader, out io.Writer) error {
 		}
 	}
 
-	discoveryRoot, err := prompt(r, out, "Discovery root (where your repos live)", "")
-	if err != nil {
-		return err
-	}
-	if discoveryRoot == "" {
-		return fmt.Errorf("discovery root is required")
+	var (
+		discoveryRoot string
+		maxDepthStr   string
+		spacesRoot    string
+		branchPrefix  string
+		err           error
+	)
+
+	if useDefaults {
+		discoveryRoot = defaultDiscoveryRoot
+		maxDepthStr = defaultMaxDepth
+		spacesRoot = defaultSpacesRoot
+		branchPrefix = defaultBranchPrefix
+	} else {
+		discoveryRoot, err = prompt(r, out, "Discovery root (where your repos live)", defaultDiscoveryRoot)
+		if err != nil {
+			return err
+		}
+
+		maxDepthStr, err = prompt(r, out, "Max scan depth", defaultMaxDepth)
+		if err != nil {
+			return err
+		}
+
+		spacesRoot, err = prompt(r, out, "Workspace root (where spaces will be created)", defaultSpacesRoot)
+		if err != nil {
+			return err
+		}
+
+		branchPrefix, err = prompt(r, out, `Branch prefix (optional, e.g. "yourname/")`, defaultBranchPrefix)
+		if err != nil {
+			return err
+		}
 	}
 
-	maxDepthStr, err := prompt(r, out, "Max scan depth", "2")
-	if err != nil {
-		return err
-	}
 	maxDepth, err := strconv.Atoi(maxDepthStr)
 	if err != nil || maxDepth < 1 {
 		return fmt.Errorf("max scan depth must be a positive integer, got %q", maxDepthStr)
-	}
-
-	spacesRoot, err := prompt(r, out, "Workspace root (where spaces will be created)", "")
-	if err != nil {
-		return err
-	}
-	if spacesRoot == "" {
-		return fmt.Errorf("workspace root is required")
-	}
-
-	branchPrefix, err := prompt(r, out, `Branch prefix (optional, e.g. "yourname/")`, "")
-	if err != nil {
-		return err
 	}
 
 	cfg := config.Config{
