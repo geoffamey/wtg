@@ -236,20 +236,15 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 		return fmt.Errorf("load space %q: %w", spaceName, err)
 	}
 
-	type pushResult struct {
-		name string
-		sym  string
-		msg  string
-	}
-	results := make([]pushResult, len(sp.Repos))
+	results := make([]opResult, len(sp.Repos))
 
 	var g errgroup.Group
 	for i, r := range sp.Repos {
 		g.Go(func() error {
 			if err := runner.Push(r.WorktreePath, sp.Branch); err != nil {
-				results[i] = pushResult{r.Name, ui.SymFail, err.Error()}
+				results[i] = opResult{r.Name, ui.SymFail, err.Error()}
 			} else {
-				results[i] = pushResult{r.Name, ui.SymOK, "pushed " + sp.Branch}
+				results[i] = opResult{r.Name, ui.SymOK, "pushed " + sp.Branch}
 			}
 			return nil
 		})
@@ -278,26 +273,21 @@ func RunSpaceRebase(runner git.Runner, spaceName string, out io.Writer) error {
 		return fmt.Errorf("load space %q: %w", spaceName, err)
 	}
 
-	type rebaseResult struct {
-		name string
-		sym  string
-		msg  string
-	}
-	results := make([]rebaseResult, len(sp.Repos))
+	results := make([]opResult, len(sp.Repos))
 
 	var g errgroup.Group
 	for i, r := range sp.Repos {
 		g.Go(func() error {
 			defaultBranch, err := runner.DefaultBranch(r.RepoPath)
 			if err != nil {
-				results[i] = rebaseResult{r.Name, ui.SymFail, fmt.Sprintf("default branch: %v", err)}
+				results[i] = opResult{r.Name, ui.SymFail, fmt.Sprintf("default branch: %v", err)}
 				return nil
 			}
 			onto := "origin/" + defaultBranch
 			if err := runner.Rebase(r.WorktreePath, onto); err != nil {
-				results[i] = rebaseResult{r.Name, ui.SymFail, err.Error()}
+				results[i] = opResult{r.Name, ui.SymFail, err.Error()}
 			} else {
-				results[i] = rebaseResult{r.Name, ui.SymOK, "rebased onto " + onto}
+				results[i] = opResult{r.Name, ui.SymOK, "rebased onto " + onto}
 			}
 			return nil
 		})

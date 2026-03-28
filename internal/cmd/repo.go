@@ -16,6 +16,13 @@ import (
 	"github.com/geoffamey/wtg/internal/ui"
 )
 
+// opResult holds the outcome of one parallel operation for display in a table.
+type opResult struct {
+	name string
+	sym  string
+	msg  string
+}
+
 // RepoCommand returns the `wtg repo` command with its subcommands.
 func RepoCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
@@ -151,21 +158,16 @@ func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Write
 		return err
 	}
 
-	type fetchResult struct {
-		name string
-		sym  string
-		msg  string
-	}
-	results := make([]fetchResult, len(paths))
+	results := make([]opResult, len(paths))
 
 	var g errgroup.Group
 	for i, p := range paths {
 		g.Go(func() error {
 			name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
 			if err := runner.Fetch(p); err != nil {
-				results[i] = fetchResult{name, ui.SymFail, err.Error()}
+				results[i] = opResult{name, ui.SymFail, err.Error()}
 			} else {
-				results[i] = fetchResult{name, ui.SymOK, "fetched"}
+				results[i] = opResult{name, ui.SymOK, "fetched"}
 			}
 			return nil
 		})
@@ -193,19 +195,14 @@ func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer
 		return err
 	}
 
-	type syncResult struct {
-		name string
-		sym  string
-		msg  string
-	}
-	results := make([]syncResult, len(paths))
+	results := make([]opResult, len(paths))
 
 	var g errgroup.Group
 	for i, p := range paths {
 		g.Go(func() error {
 			name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
 			sym, msg := syncOne(p, runner)
-			results[i] = syncResult{name, sym, msg}
+			results[i] = opResult{name, sym, msg}
 			return nil
 		})
 	}
