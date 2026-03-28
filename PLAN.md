@@ -23,6 +23,12 @@ Each command includes unit tests (mock `Runner`) in the same session.
 - [x] `wtg space delete`
 - [x] `wtg status`
 
+## Phase 4 — Gap closure
+
+- [ ] `wtg status` with no args detects if CWD is inside a workspace and shows that space; otherwise shows summary of all spaces
+- [ ] `wtg status <name>` shows per-repo detail (branch, clean/dirty, ahead/behind) — current impl shows summary row only
+- [ ] `wtg space list` includes repo names alongside count
+
 ## Phase 3 — Polish
 
 - [x] Shell completions (bash, zsh, fish)
