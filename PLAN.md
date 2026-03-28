@@ -26,5 +26,5 @@ Each command includes unit tests (mock `Runner`) in the same session.
 ## Phase 3 — Polish
 
 - [x] Shell completions (bash, zsh, fish)
-- [ ] CI (GitHub Actions: build + test)
-- [ ] Release workflow (goreleaser)
+- [x] CI (GitHub Actions: build + test)
+- [x] Release workflow — skipped; `go install` is sufficient for a Go developer audience
