@@ -10,18 +10,21 @@ When a feature spans multiple repos, `wtg` checks out a shared branch across all
 go install github.com/geoffamey/wtg@latest
 ```
 
-### Shell completions (fish)
+### Shell completions
 
+**fish:**
 ```fish
 wtg completion fish > ~/.config/fish/completions/wtg.fish
 ```
 
-Or to source dynamically from your `config.fish` / `conf.d`:
+**bash** — add to `~/.bashrc`:
+```bash
+source <(wtg completion bash)
+```
 
-```fish
-if status is-interactive
-    wtg completion fish | source
-end
+**zsh** — add to `~/.zshrc`:
+```zsh
+source <(wtg completion zsh)
 ```
 
 ### `wcd` — cd into a space
@@ -166,7 +169,5 @@ myfeature   geoff/myfeature   ~/workspaces/myfeature   3 repos
 
 ## Future work
 
-- `space rebase <name>` — rebase all worktrees onto updated default branch
-- `space exec <name> <cmd>` — run a command in each repo of a space
 - `space rename <old> <new>` — rename a space and its directory
 - `repo clone <url>` — clone into `discovery.root_dir` and make available immediately
