@@ -10,9 +10,36 @@ When a feature spans multiple repos, `wtg` checks out a shared branch across all
 go install github.com/geoffamey/wtg@latest
 ```
 
-Fish completions:
-```sh
+### Shell completions (fish)
+
+```fish
 wtg completion fish > ~/.config/fish/completions/wtg.fish
+```
+
+Or to source dynamically from your `config.fish` / `conf.d`:
+
+```fish
+if status is-interactive
+    wtg completion fish | source
+end
+```
+
+### `wcd` — cd into a space
+
+Since `cd` must run in the current shell, add a wrapper function. `wtg space path <name>` prints the space's root path.
+
+**fish:**
+```fish
+function wcd
+    cd (wtg space path $argv[1])
+end
+```
+
+**bash / zsh:**
+```bash
+wcd() {
+    cd "$(wtg space path "$1")"
+}
 ```
 
 ## Concepts
