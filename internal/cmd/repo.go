@@ -146,22 +146,9 @@ func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Write
 		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
 	}
 
-	var paths []string
-	if len(args) == 0 {
-		discovered, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
-		if err != nil {
-			return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
-		}
-		paths = discovered
-		sort.Strings(paths)
-	} else {
-		for _, name := range args {
-			p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
-			if err != nil {
-				return err
-			}
-			paths = append(paths, p)
-		}
+	paths, err := resolveRepoPaths(cfg, args)
+	if err != nil {
+		return err
 	}
 
 	type fetchResult struct {
@@ -201,22 +188,9 @@ func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer
 		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
 	}
 
-	var paths []string
-	if len(args) == 0 {
-		discovered, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
-		if err != nil {
-			return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
-		}
-		paths = discovered
-		sort.Strings(paths)
-	} else {
-		for _, name := range args {
-			p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
-			if err != nil {
-				return err
-			}
-			paths = append(paths, p)
-		}
+	paths, err := resolveRepoPaths(cfg, args)
+	if err != nil {
+		return err
 	}
 
 	type syncResult struct {
@@ -300,6 +274,29 @@ func resolveRepoPath(rootDir, name string) (string, error) {
 	return p, nil
 }
 
+// resolveRepoPaths returns paths for all repos to operate on. When args is
+// empty it discovers all repos under cfg.Discovery.RootDir (sorted); otherwise
+// it resolves each named arg to an absolute path.
+func resolveRepoPaths(cfg *config.Config, args []string) ([]string, error) {
+	if len(args) == 0 {
+		paths, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
+		if err != nil {
+			return nil, fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
+		}
+		sort.Strings(paths)
+		return paths, nil
+	}
+	paths := make([]string, 0, len(args))
+	for _, name := range args {
+		p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p)
+	}
+	return paths, nil
+}
+
 // RunRepoStatus prints a status table for all discovered repos (or the named
 // subset). Each row shows the repo name, current branch, working-tree state,
 // and ahead/behind counts relative to origin.
@@ -308,22 +305,9 @@ func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.
 		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
 	}
 
-	var paths []string
-	if len(args) == 0 {
-		discovered, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
-		if err != nil {
-			return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
-		}
-		paths = discovered
-		sort.Strings(paths)
-	} else {
-		for _, name := range args {
-			p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
-			if err != nil {
-				return err
-			}
-			paths = append(paths, p)
-		}
+	paths, err := resolveRepoPaths(cfg, args)
+	if err != nil {
+		return err
 	}
 
 	type statusResult struct {
