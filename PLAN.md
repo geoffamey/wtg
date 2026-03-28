@@ -35,3 +35,12 @@ Each command includes unit tests (mock `Runner`) in the same session.
 - [ ] `wtg status <name>` shows per-repo detail (branch, clean/dirty, ahead/behind) — current impl shows summary row only
 - [ ] `wtg status <name> --detailed` lists individual modified files per repo
 - [ ] `wtg space list` includes repo names alongside count
+
+## Phase 5 — Enhancements
+
+- [ ] Parallelize `repo sync` and `repo status` (currently sequential, network-bound)
+- [ ] `wtg repo fetch [<repo>...]` — fetch from origin without fast-forwarding (lighter-weight alternative to sync)
+- [ ] `wtg space exec <name> <cmd>` — run a shell command in each worktree of a space
+- [ ] `wtg space push <name>` — push all branches in a space to origin
+- [ ] `--base <branch>` flag on `wtg space create` — branch from something other than the default branch
+- [ ] `wtg space rebase <name>` — rebase all worktrees onto the updated default branch
