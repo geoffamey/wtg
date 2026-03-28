@@ -16,25 +16,25 @@ import (
 
 // Config holds all wtg configuration.
 type Config struct {
-	Discovery DiscoveryConfig `koanf:"discovery"`
-	Spaces    SpacesConfig    `koanf:"spaces"`
-	Git       GitConfig       `koanf:"git"`
+	Discovery DiscoveryConfig `koanf:"discovery" yaml:"discovery"`
+	Spaces    SpacesConfig    `koanf:"spaces"    yaml:"spaces"`
+	Git       GitConfig       `koanf:"git"       yaml:"git"`
 }
 
 // DiscoveryConfig controls repo scanning.
 type DiscoveryConfig struct {
-	RootDir  string `koanf:"root_dir"`
-	MaxDepth int    `koanf:"max_depth"`
+	RootDir  string `koanf:"root_dir"  yaml:"root_dir"`
+	MaxDepth int    `koanf:"max_depth" yaml:"max_depth"`
 }
 
 // SpacesConfig controls workspace directory placement.
 type SpacesConfig struct {
-	RootDir string `koanf:"root_dir"`
+	RootDir string `koanf:"root_dir" yaml:"root_dir"`
 }
 
 // GitConfig controls git operation behaviour.
 type GitConfig struct {
-	BranchPrefix string `koanf:"branch_prefix"`
+	BranchPrefix string `koanf:"branch_prefix" yaml:"branch_prefix"`
 }
 
 // DefaultPath returns the default config file path following the XDG Base Directory
