@@ -14,7 +14,7 @@ import (
 
 func TestRunSpaceRebase_RebasesAllRepos(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc"}, "/repos")
 
 	r := &testRunner{
 		defaultBranchFn: func(string) (string, error) { return "main", nil },
@@ -39,7 +39,7 @@ func TestRunSpaceRebase_RebasesAllRepos(t *testing.T) {
 
 func TestRunSpaceRebase_RebaseError(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api"}, "/repos")
 
 	r := &testRunner{
 		defaultBranchFn: func(string) (string, error) { return "main", nil },
@@ -61,7 +61,7 @@ func TestRunSpaceRebase_RebaseError(t *testing.T) {
 
 func TestRunSpaceRebase_DefaultBranchError(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api"}, "/repos")
 
 	r := &testRunner{
 		defaultBranchFn: func(string) (string, error) { return "", fmt.Errorf("no origin/HEAD") },
@@ -91,7 +91,7 @@ func TestRunSpaceRebase_UnknownSpace(t *testing.T) {
 func TestRunSpaceRebase_Parallel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		isolateState(t)
-		statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc", "web"}, "/repos")
+		makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc", "web"}, "/repos")
 
 		gate := make(chan struct{})
 		var started atomic.Int32

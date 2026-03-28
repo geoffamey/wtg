@@ -14,7 +14,7 @@ import (
 
 func TestRunSpacePush_PushesAllRepos(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc"}, "/repos")
 
 	r := &testRunner{pushFn: func(string, string) error { return nil }}
 
@@ -33,7 +33,7 @@ func TestRunSpacePush_PushesAllRepos(t *testing.T) {
 
 func TestRunSpacePush_PushError(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api"}, "/repos")
 
 	r := &testRunner{pushFn: func(string, string) error { return fmt.Errorf("rejected") }}
 
@@ -61,7 +61,7 @@ func TestRunSpacePush_UnknownSpace(t *testing.T) {
 func TestRunSpacePush_Parallel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		isolateState(t)
-		statusSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc", "web"}, "/repos")
+		makeSpace(t, "feat", "geoff/feat", t.TempDir(), []string{"api", "svc", "web"}, "/repos")
 
 		gate := make(chan struct{})
 		var started atomic.Int32

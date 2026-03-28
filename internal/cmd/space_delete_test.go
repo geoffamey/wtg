@@ -40,7 +40,7 @@ func TestRunSpaceDelete_RemovesWorktrees(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
 
 	var removed []string
 	r := deleteRunner(cleanStatus)
@@ -66,7 +66,7 @@ func TestRunSpaceDelete_NotForced_WhenClean(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	var usedForce bool
 	r := deleteRunner(cleanStatus)
@@ -90,7 +90,7 @@ func TestRunSpaceDelete_DirtyWorktree_UserDeclines(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	dirtyStatus := func(_ string) (git.RepoStatus, error) {
 		return git.RepoStatus{Files: []git.FileStatus{{Path: "a.go", Index: 'M'}}}, nil
@@ -115,7 +115,7 @@ func TestRunSpaceDelete_DirtyWorktree_UserConfirms(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	dirtyStatus := func(_ string) (git.RepoStatus, error) {
 		return git.RepoStatus{Files: []git.FileStatus{{Path: "a.go", Index: 'M'}}}, nil
@@ -143,7 +143,7 @@ func TestRunSpaceDelete_UnpushedCommits_Warned(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	aheadStatus := func(_ string) (git.RepoStatus, error) {
 		return git.RepoStatus{Ahead: 2}, nil
@@ -163,7 +163,7 @@ func TestRunSpaceDelete_DeleteBranch(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "mybranch", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "mybranch", spacePath, []string{"api"}, root)
 
 	var deletedBranch string
 	var deletedForce bool
@@ -190,7 +190,7 @@ func TestRunSpaceDelete_ForceBranch(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "mybranch", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "mybranch", spacePath, []string{"api"}, root)
 
 	var deletedForce bool
 	r := deleteRunner(cleanStatus)
@@ -214,7 +214,7 @@ func TestRunSpaceDelete_BranchDeleteFailure_StateStillDeleted(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	r := deleteRunner(cleanStatus)
 	r.branchDeleteFn = func(_, _ string, _ bool) error {
@@ -239,7 +239,7 @@ func TestRunSpaceDelete_NoBranchDelete_WhenNoFlag(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	r := deleteRunner(cleanStatus)
 	// branchDeleteFn intentionally not set — panics if called unexpectedly.
@@ -257,7 +257,7 @@ func TestRunSpaceDelete_PartialFailure_StatePreserved(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
 
 	callCount := 0
 	r := deleteRunner(cleanStatus)
@@ -290,7 +290,7 @@ func TestRunSpaceDelete_MixedDirtyClean_PromptFires(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
 
 	statusCalls := map[string]git.RepoStatus{
 		"api":      {Files: []git.FileStatus{{Path: "a.go", Index: 'M'}}},
@@ -331,7 +331,7 @@ func TestRunSpaceDelete_StatusError_SkippedSilently(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	r := &testRunner{
 		statusFn:         func(_ string) (git.RepoStatus, error) { return git.RepoStatus{}, fmt.Errorf("no such path") },
@@ -351,7 +351,7 @@ func TestRunSpaceDelete_StatusError_SkippedSilently(t *testing.T) {
 func TestRunSpaceDelete_EmptySpace_DeletesState(t *testing.T) {
 	isolateState(t)
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, nil, "")
+	makeSpace(t, "feat", "feat", spacePath, nil, "")
 
 	var out bytes.Buffer
 	if err := RunSpaceDelete(&testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
@@ -368,7 +368,7 @@ func TestRunSpaceDelete_WorktreeRemoveError_StatePreserved(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
 	spacePath := t.TempDir()
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	r := deleteRunner(cleanStatus)
 	r.worktreeRemoveFn = func(_, _ string, _ bool) error {

@@ -13,8 +13,8 @@ import (
 	"github.com/geoffamey/wtg/internal/state"
 )
 
-// seedSpace saves a space to state with the given repos already in it.
-func seedSpace(t *testing.T, name, branch, spacePath string, repoNames []string, repoRoot string) *state.Space {
+// makeSpace saves a space to state with the given repos already in it.
+func makeSpace(t *testing.T, name, branch, spacePath string, repoNames []string, repoRoot string) *state.Space {
 	t.Helper()
 	sp := &state.Space{
 		Name:      name,
@@ -30,7 +30,7 @@ func seedSpace(t *testing.T, name, branch, spacePath string, repoNames []string,
 		})
 	}
 	if err := state.Save(sp); err != nil {
-		t.Fatalf("seedSpace: %v", err)
+		t.Fatalf("makeSpace: %v", err)
 	}
 	return sp
 }
@@ -74,7 +74,7 @@ func TestRunSpaceAdd_RepoAlreadyInSpace(t *testing.T) {
 	spacesRoot := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
-	seedSpace(t, "feat", "feat", filepath.Join(spacesRoot, "feat"), []string{"api"}, root)
+	makeSpace(t, "feat", "feat", filepath.Join(spacesRoot, "feat"), []string{"api"}, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
 	var out bytes.Buffer
 	err := RunSpaceAdd(cfg, &testRunner{}, SpaceAddArgs{Name: "feat", Repos: []string{"api"}}, &out)
@@ -91,7 +91,7 @@ func TestRunSpaceAdd_UnknownRepo(t *testing.T) {
 	spacesRoot := t.TempDir()
 	isolateState(t)
 	spacePath := filepath.Join(spacesRoot, "feat")
-	seedSpace(t, "feat", "feat", spacePath, nil, root)
+	makeSpace(t, "feat", "feat", spacePath, nil, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
 	var out bytes.Buffer
 	err := RunSpaceAdd(cfg, &testRunner{}, SpaceAddArgs{Name: "feat", Repos: []string{"no-such-repo"}}, &out)
@@ -112,7 +112,7 @@ func TestRunSpaceAdd_Success(t *testing.T) {
 	makeRepo(t, root, "api")
 	makeRepo(t, root, "frontend")
 	spacePath := filepath.Join(spacesRoot, "feat")
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
 
 	var added []string
@@ -150,7 +150,7 @@ func TestRunSpaceAdd_UsesSpaceBranch(t *testing.T) {
 	isolateState(t)
 	makeRepo(t, root, "frontend")
 	spacePath := filepath.Join(spacesRoot, "feat")
-	seedSpace(t, "feat", "geoff/feat", spacePath, nil, root)
+	makeSpace(t, "feat", "geoff/feat", spacePath, nil, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
 
 	var usedBranch string
@@ -197,7 +197,7 @@ func TestRunSpaceAdd_GoWorkUpdated(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(spacePath, "go.work"), []byte(oldGoWork), 0o644); err != nil {
 		t.Fatalf("write old go.work: %v", err)
 	}
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
 
 	var out bytes.Buffer
@@ -229,7 +229,7 @@ func TestRunSpaceAdd_RollbackRestoresState(t *testing.T) {
 	isolateState(t)
 	makeRepo(t, root, "frontend")
 	spacePath := filepath.Join(spacesRoot, "feat")
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
 
 	r := &testRunner{
@@ -278,7 +278,7 @@ func TestRunSpaceAdd_RollbackRestoresGoWork(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(spacePath, "go.work"), []byte(oldGoWork), 0o644); err != nil {
 		t.Fatalf("write old go.work: %v", err)
 	}
-	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	// Make the state file read-only so state.Save (WriteFile) fails while
 	// state.Load (ReadFile) still works.

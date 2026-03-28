@@ -5,34 +5,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/geoffamey/wtg/internal/git"
-	"github.com/geoffamey/wtg/internal/state"
 	"github.com/geoffamey/wtg/internal/ui"
 )
 
-// statusSpace saves a space to state with the given repos.
-func statusSpace(t *testing.T, name, branch, spacePath string, repos []string, repoRoot string) *state.Space {
-	t.Helper()
-	sp := &state.Space{
-		Name:      name,
-		Branch:    branch,
-		Path:      spacePath,
-		CreatedAt: time.Now(),
-	}
-	for _, n := range repos {
-		sp.Repos = append(sp.Repos, state.RepoEntry{
-			Name:         n,
-			RepoPath:     repoRoot + "/" + n,
-			WorktreePath: spacePath + "/" + n,
-		})
-	}
-	if err := state.Save(sp); err != nil {
-		t.Fatalf("statusSpace save: %v", err)
-	}
-	return sp
-}
 
 func alwaysStatus(st git.RepoStatus) func(string) (git.RepoStatus, error) {
 	return func(_ string) (git.RepoStatus, error) { return st, nil }
@@ -56,7 +33,7 @@ func TestRunStatus_NoSpaces(t *testing.T) {
 func TestRunStatus_ShowsSpaceHeader(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat", Upstream: "origin/geoff/feat"})}
 	var out bytes.Buffer
@@ -78,7 +55,7 @@ func TestRunStatus_ShowsSpaceHeader(t *testing.T) {
 func TestRunStatus_OnSpaceBranch_ShowsMuted(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
@@ -94,7 +71,7 @@ func TestRunStatus_OnSpaceBranch_ShowsMuted(t *testing.T) {
 func TestRunStatus_WrongBranch_ShowsWarn(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "other-branch"})}
 	var out bytes.Buffer
@@ -110,7 +87,7 @@ func TestRunStatus_WrongBranch_ShowsWarn(t *testing.T) {
 func TestRunStatus_DirtyWorktree(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	dirty := git.RepoStatus{
 		Branch: "geoff/feat",
@@ -129,7 +106,7 @@ func TestRunStatus_DirtyWorktree(t *testing.T) {
 func TestRunStatus_StatusError_ShowsFailRow(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: func(_ string) (git.RepoStatus, error) {
 		return git.RepoStatus{}, fmt.Errorf("worktree missing")
@@ -147,8 +124,8 @@ func TestRunStatus_StatusError_ShowsFailRow(t *testing.T) {
 
 func TestRunStatus_NamedSpaces(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "feat", "feat", t.TempDir(), []string{"api"}, "/repos")
-	statusSpace(t, "other", "other", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "feat", "feat", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "other", "other", t.TempDir(), []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "feat"})}
 	var out bytes.Buffer
@@ -180,8 +157,8 @@ func TestRunStatus_UnknownSpace_Error(t *testing.T) {
 
 func TestRunStatus_MultipleSpaces_SortedAndSeparated(t *testing.T) {
 	isolateState(t)
-	statusSpace(t, "zebra", "zebra", t.TempDir(), []string{"api"}, "/repos")
-	statusSpace(t, "alpha", "alpha", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "zebra", "zebra", t.TempDir(), []string{"api"}, "/repos")
+	makeSpace(t, "alpha", "alpha", t.TempDir(), []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "feat"})}
 	var out bytes.Buffer
@@ -199,7 +176,7 @@ func TestRunStatus_MultipleSpaces_SortedAndSeparated(t *testing.T) {
 func TestRunStatus_NoArg_OutsideSpace_ShowsSummary(t *testing.T) {
 	isolateState(t)
 	// Use a path that does not contain the test's CWD.
-	statusSpace(t, "feat", "geoff/feat", "/nonexistent/path/feat", []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", "/nonexistent/path/feat", []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
@@ -221,7 +198,7 @@ func TestRunStatus_NoArg_InsideSpace_ShowsDetail(t *testing.T) {
 	isolateState(t)
 	dir := t.TempDir()
 	t.Chdir(dir)
-	statusSpace(t, "feat", "geoff/feat", dir, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", dir, []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
@@ -240,7 +217,7 @@ func TestRunStatus_NoArg_InsideSpace_ShowsDetail(t *testing.T) {
 func TestRunStatus_Detailed_ShowsFiles(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	dirty := git.RepoStatus{
 		Branch: "geoff/feat",
@@ -266,7 +243,7 @@ func TestRunStatus_Detailed_ShowsFiles(t *testing.T) {
 func TestRunStatus_Detailed_CleanRepo_NoFileLines(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
-	statusSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
