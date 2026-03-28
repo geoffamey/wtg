@@ -8,7 +8,7 @@
 - [x] `Runner` integration tests (real git repos in `t.TempDir()`)
 - [x] State file types + read/write (`internal/state/`)
 - [x] Saga implementation + tests (`internal/saga/`)
-- [ ] UI helpers — shared lipgloss styles and output formatting (`internal/ui/`)
+- [x] UI helpers — shared lipgloss styles and output formatting (`internal/ui/`)
 
 ## Phase 2 — Commands
 
