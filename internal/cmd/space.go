@@ -93,6 +93,22 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
+				Name:      "path",
+				Usage:     "print the root path of a space",
+				ArgsUsage: "<name>",
+				Action: func(c *cli.Context) error {
+					if c.NArg() == 0 {
+						return fmt.Errorf("missing required argument: <name>")
+					}
+					sp, err := state.Load(c.Args().First())
+					if err != nil {
+						return err
+					}
+					fmt.Println(sp.Path)
+					return nil
+				},
+			},
+			{
 				Name:      "add",
 				Usage:     "add repos to an existing workspace",
 				ArgsUsage: "<name> <repo>...",
