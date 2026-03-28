@@ -32,6 +32,18 @@ func RepoCommand(runner git.Runner) *cli.Command {
 					return RunDiscover(cfg, runner, os.Stdout)
 				},
 			},
+			{
+				Name:      "sync",
+				Usage:     "fetch and fast-forward repos to origin's default branch",
+				ArgsUsage: "[<repo>...]",
+				Action: func(c *cli.Context) error {
+					cfg, err := config.Load(c.String("config"))
+					if err != nil {
+						return err
+					}
+					return RunSync(cfg, runner, c.Args().Slice(), os.Stdout)
+				},
+			},
 		},
 	}
 }
@@ -98,4 +110,95 @@ func scanDir(dir string, maxDepth, depth int) ([]string, error) {
 func isGitRepo(path string) bool {
 	_, err := os.Stat(filepath.Join(path, ".git"))
 	return err == nil
+}
+
+// RunSync fetches and fast-forwards each repo's default branch. If args is
+// empty, all discovered repos are synced. Otherwise, args are short names
+// (relative to discovery.root_dir) to sync.
+func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer) error {
+	if cfg.Discovery.RootDir == "" {
+		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
+	}
+
+	var paths []string
+	if len(args) == 0 {
+		discovered, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
+		if err != nil {
+			return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
+		}
+		paths = discovered
+		sort.Strings(paths)
+	} else {
+		for _, name := range args {
+			p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
+			if err != nil {
+				return err
+			}
+			paths = append(paths, p)
+		}
+	}
+
+	tbl := ui.NewTableWriter(out)
+	for _, p := range paths {
+		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+		sym, msg := syncOne(p, runner)
+		tbl.Row(name, sym+" "+msg)
+	}
+	tbl.Flush()
+	return nil
+}
+
+// syncOne performs the fetch + fast-forward for a single repo and returns a
+// symbol and human-readable message describing the outcome.
+func syncOne(repoPath string, runner git.Runner) (string, string) {
+	defaultBranch, err := runner.DefaultBranch(repoPath)
+	if err != nil {
+		return ui.SymFail, fmt.Sprintf("error: %v", err)
+	}
+
+	st, err := runner.Status(repoPath)
+	if err != nil {
+		return ui.SymFail, fmt.Sprintf("error: %v", err)
+	}
+
+	if st.Branch != defaultBranch {
+		return ui.SymWarn, fmt.Sprintf("skipped — on branch %s, not %s", st.Branch, defaultBranch)
+	}
+	if len(st.Files) > 0 {
+		return ui.SymWarn, "skipped — working tree is dirty"
+	}
+
+	if err := runner.Fetch(repoPath); err != nil {
+		return ui.SymFail, fmt.Sprintf("error fetching: %v", err)
+	}
+
+	st, err = runner.Status(repoPath)
+	if err != nil {
+		return ui.SymFail, fmt.Sprintf("error: %v", err)
+	}
+
+	if st.Behind == 0 {
+		return ui.SymOK, "up to date"
+	}
+
+	if err := runner.FastForward(repoPath, defaultBranch); err != nil {
+		return ui.SymFail, fmt.Sprintf("error fast-forwarding: %v", err)
+	}
+
+	n := st.Behind
+	commits := "commits"
+	if n == 1 {
+		commits = "commit"
+	}
+	return ui.SymUp, fmt.Sprintf("fast-forwarded to origin/%s (%d %s)", defaultBranch, n, commits)
+}
+
+// resolveRepoPath converts a short repo name to an absolute path, checking
+// that a git repo actually exists there.
+func resolveRepoPath(rootDir, name string) (string, error) {
+	p := filepath.Join(rootDir, filepath.FromSlash(name))
+	if !isGitRepo(p) {
+		return "", fmt.Errorf("repo %q not found under %s", name, rootDir)
+	}
+	return p, nil
 }
