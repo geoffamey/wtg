@@ -298,6 +298,7 @@ func TestRunSpaceCreate_RollbackOnFailure(t *testing.T) {
 			removed = append(removed, worktreePath)
 			return nil
 		},
+		branchDeleteFn: func(_, _ string, _ bool) error { return nil },
 	}
 
 	var out bytes.Buffer
@@ -315,6 +316,76 @@ func TestRunSpaceCreate_RollbackOnFailure(t *testing.T) {
 	// State should NOT be saved.
 	if _, err := state.Load("feat"); err == nil {
 		t.Error("state should not be saved when saga fails")
+	}
+}
+
+func TestRunSpaceCreate_RollbackDeletesCreatedBranch(t *testing.T) {
+	root := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	makeRepo(t, root, "frontend")
+	cfg := spaceCreateCfg(root, t.TempDir())
+
+	addCount := 0
+	var deletedBranches []string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil }, // new branch
+		worktreeAddFn: func(_, _, _ string, _ bool) error {
+			addCount++
+			if addCount == 2 {
+				return fmt.Errorf("disk full")
+			}
+			return nil
+		},
+		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
+		branchDeleteFn: func(_, branch string, _ bool) error {
+			deletedBranches = append(deletedBranches, branch)
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	_ = RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out)
+
+	if len(deletedBranches) != 1 || deletedBranches[0] != "feat" {
+		t.Errorf("expected created branch to be deleted on rollback, got %v", deletedBranches)
+	}
+}
+
+func TestRunSpaceCreate_RollbackPreservesExistingBranch(t *testing.T) {
+	root := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	makeRepo(t, root, "frontend")
+	cfg := spaceCreateCfg(root, t.TempDir())
+
+	addCount := 0
+	branchDeleted := false
+	r := &testRunner{
+		// Branch already exists but is not checked out.
+		branchExistsFn: func(_, _ string) (bool, error) { return true, nil },
+		worktreeListFn: func(_ string) ([]git.WorktreeInfo, error) {
+			return []git.WorktreeInfo{{Path: "/repo", Branch: "main"}}, nil
+		},
+		worktreeAddFn: func(_, _, _ string, _ bool) error {
+			addCount++
+			if addCount == 2 {
+				return fmt.Errorf("disk full")
+			}
+			return nil
+		},
+		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
+		branchDeleteFn: func(_, _ string, _ bool) error {
+			branchDeleted = true
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	_ = RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat", Branch: "feat"}, &out)
+
+	if branchDeleted {
+		t.Error("pre-existing branch should not be deleted on rollback")
 	}
 }
 

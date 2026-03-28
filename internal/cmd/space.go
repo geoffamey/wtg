@@ -158,7 +158,14 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 				return runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, t.createBranch)
 			},
 			Undo: func(ctx context.Context) error {
-				return runner.WorktreeRemove(t.repoPath, t.worktreePath, true)
+				if err := runner.WorktreeRemove(t.repoPath, t.worktreePath, true); err != nil {
+					return err
+				}
+				// Only delete the branch if we created it; leave pre-existing branches alone.
+				if t.createBranch {
+					return runner.BranchDelete(t.repoPath, branch, true)
+				}
+				return nil
 			},
 		})
 	}
