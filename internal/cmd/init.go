@@ -36,13 +36,13 @@ func RunInit(configPath string, in io.Reader, out io.Writer) error {
 
 	// If a config already exists, confirm before overwriting.
 	if _, err := os.Stat(configPath); err == nil {
-		fmt.Fprintf(out, "Config already exists at %s\n", configPath) //nolint:errcheck
+		fmt.Fprintf(out, "Config already exists at %s\n", configPath)
 		ok, err := confirm(r, out, "Overwrite?")
 		if err != nil {
 			return err
 		}
 		if !ok {
-			fmt.Fprintln(out, "Aborted.") //nolint:errcheck
+			fmt.Fprintln(out, "Aborted.")
 			return nil
 		}
 	}
@@ -101,6 +101,6 @@ func RunInit(configPath string, in io.Reader, out io.Writer) error {
 		return fmt.Errorf("write config: %w", err)
 	}
 
-	fmt.Fprintf(out, "\nConfig written to %s\n", configPath) //nolint:errcheck
+	fmt.Fprintf(out, "\nConfig written to %s\n", configPath)
 	return nil
 }

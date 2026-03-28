@@ -19,9 +19,9 @@ const (
 
 // Styles.
 var (
-	OK   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))  // green
-	Warn = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))  // yellow
-	Fail = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))  // red
+	OK    = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
+	Warn  = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
+	Fail  = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
 	Muted = lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // bright black / grey
 	Bold  = lipgloss.NewStyle().Bold(true)
 )
@@ -46,14 +46,14 @@ func NewTableWriter(w io.Writer) *Table {
 func (t *Table) Row(fields ...string) {
 	for i, f := range fields {
 		if i > 0 {
-			t.w.Write([]byte("\t")) //nolint:errcheck
+			t.w.Write([]byte("\t"))
 		}
-		t.w.Write([]byte(f)) //nolint:errcheck
+		t.w.Write([]byte(f))
 	}
-	t.w.Write([]byte("\n")) //nolint:errcheck
+	t.w.Write([]byte("\n"))
 }
 
 // Flush finalises the tabwriter alignment and flushes all output.
 func (t *Table) Flush() {
-	t.w.Flush() //nolint:errcheck
+	t.w.Flush()
 }

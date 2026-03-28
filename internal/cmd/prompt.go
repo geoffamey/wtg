@@ -11,9 +11,9 @@ import (
 // If the user enters nothing (or EOF is reached), defaultVal is returned.
 func prompt(r *bufio.Reader, out io.Writer, message, defaultVal string) (string, error) {
 	if defaultVal != "" {
-		fmt.Fprintf(out, "%s [%s]: ", message, defaultVal) //nolint:errcheck
+		fmt.Fprintf(out, "%s [%s]: ", message, defaultVal)
 	} else {
-		fmt.Fprintf(out, "%s: ", message) //nolint:errcheck
+		fmt.Fprintf(out, "%s: ", message)
 	}
 
 	line, err := r.ReadString('\n')
@@ -29,7 +29,7 @@ func prompt(r *bufio.Reader, out io.Writer, message, defaultVal string) (string,
 
 // confirm writes a [y/N] prompt and returns true only if the user types "y" or "Y".
 func confirm(r *bufio.Reader, out io.Writer, message string) (bool, error) {
-	fmt.Fprintf(out, "%s [y/N]: ", message) //nolint:errcheck
+	fmt.Fprintf(out, "%s [y/N]: ", message)
 	line, err := r.ReadString('\n')
 	if err != nil && err != io.EOF {
 		return false, err
