@@ -379,6 +379,10 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 		}
 	}
 
+	// SymFail means the worktree could not be removed — state must be preserved
+	// because the worktree still exists. SymWarn means the worktree was removed
+	// but branch deletion failed — state cleanup still proceeds since the
+	// worktree is gone and the user can delete the branch manually.
 	hadError := false
 	tbl := ui.NewTableWriter(out)
 	for _, r := range sp.Repos {

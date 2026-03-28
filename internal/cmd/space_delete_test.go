@@ -208,6 +208,33 @@ func TestRunSpaceDelete_ForceBranch(t *testing.T) {
 	}
 }
 
+func TestRunSpaceDelete_BranchDeleteFailure_StateStillDeleted(t *testing.T) {
+	// BranchDelete fails (e.g. unmerged with -d) → SymWarn, but state is deleted
+	// because the worktree was already removed successfully.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+
+	r := deleteRunner(cleanStatus)
+	r.branchDeleteFn = func(_, _ string, _ bool) error {
+		return fmt.Errorf("branch not fully merged")
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat", DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceDelete should succeed when only branch deletion fails: %v", err)
+	}
+	// State should still be deleted — the worktree is gone.
+	if _, stateErr := state.Load("feat"); stateErr == nil {
+		t.Error("state should be deleted even when branch deletion fails")
+	}
+	// Output should indicate the branch issue.
+	if !strings.Contains(out.String(), "branch not deleted") {
+		t.Errorf("output should mention branch not deleted: %q", out.String())
+	}
+}
+
 func TestRunSpaceDelete_NoBranchDelete_WhenNoFlag(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
@@ -220,6 +247,118 @@ func TestRunSpaceDelete_NoBranchDelete_WhenNoFlag(t *testing.T) {
 	var out bytes.Buffer
 	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+}
+
+// --- multi-repo behaviour ---
+
+func TestRunSpaceDelete_PartialFailure_StatePreserved(t *testing.T) {
+	// First repo removed OK, second fails → hadError=true, state preserved.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	seedSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
+
+	callCount := 0
+	r := deleteRunner(cleanStatus)
+	r.worktreeRemoveFn = func(_, _ string, _ bool) error {
+		callCount++
+		if callCount == 2 {
+			return fmt.Errorf("locked")
+		}
+		return nil
+	}
+
+	var out bytes.Buffer
+	err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out)
+	if err == nil {
+		t.Fatal("expected error when one worktree removal fails")
+	}
+	// State must survive because one worktree could not be removed.
+	if _, stateErr := state.Load("feat"); stateErr != nil {
+		t.Error("state should be preserved on partial failure")
+	}
+	// Both repos should appear in output.
+	got := out.String()
+	if !strings.Contains(got, "api") || !strings.Contains(got, "frontend") {
+		t.Errorf("output should show both repos: %q", got)
+	}
+}
+
+func TestRunSpaceDelete_MixedDirtyClean_PromptFires(t *testing.T) {
+	// One repo dirty, one clean → prompt shown, both removed with force on confirm.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	seedSpace(t, "feat", "feat", spacePath, []string{"api", "frontend"}, root)
+
+	statusCalls := map[string]git.RepoStatus{
+		"api":      {Files: []git.FileStatus{{Path: "a.go", Index: 'M'}}},
+		"frontend": {},
+	}
+	statusFn := func(path string) (git.RepoStatus, error) {
+		for name, st := range statusCalls {
+			if strings.Contains(path, name) {
+				return st, nil
+			}
+		}
+		return git.RepoStatus{}, nil
+	}
+
+	var forcedPaths []string
+	r := &testRunner{
+		statusFn: statusFn,
+		worktreeRemoveFn: func(_, worktreePath string, force bool) error {
+			if force {
+				forcedPaths = append(forcedPaths, worktreePath)
+			}
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("y\n"), &out); err != nil {
+		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+	// Both repos should be removed with force=true since any warning triggers force.
+	if len(forcedPaths) != 2 {
+		t.Errorf("expected both repos removed with force, got %d: %v", len(forcedPaths), forcedPaths)
+	}
+}
+
+func TestRunSpaceDelete_StatusError_SkippedSilently(t *testing.T) {
+	// Status fails (e.g. worktree externally deleted) — no prompt, delete proceeds.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	seedSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+
+	r := &testRunner{
+		statusFn:         func(_ string) (git.RepoStatus, error) { return git.RepoStatus{}, fmt.Errorf("no such path") },
+		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+	// No prompt should have been written (no warnings).
+	if strings.Contains(out.String(), "[y/N]") {
+		t.Errorf("should not prompt when status errors are skipped: %q", out.String())
+	}
+}
+
+func TestRunSpaceDelete_EmptySpace_DeletesState(t *testing.T) {
+	isolateState(t)
+	spacePath := t.TempDir()
+	seedSpace(t, "feat", "feat", spacePath, nil, "")
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(&testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+	if _, err := state.Load("feat"); err == nil {
+		t.Error("state should be deleted for empty space")
 	}
 }
 
