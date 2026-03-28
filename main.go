@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/geoffamey/wtg/internal/cmd"
+	"github.com/geoffamey/wtg/internal/git"
 )
 
 func main() {
@@ -22,6 +23,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			cmd.InitCommand(),
+			cmd.RepoCommand(git.New()),
 		},
 	}
 
