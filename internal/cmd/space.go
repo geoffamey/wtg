@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
@@ -121,6 +122,17 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
+				Name:      "push",
+				Usage:     "push all branches in a space to origin",
+				ArgsUsage: "<name>",
+				Action: func(c *cli.Context) error {
+					if c.NArg() == 0 {
+						return fmt.Errorf("missing required argument: <name>")
+					}
+					return RunSpacePush(runner, c.Args().First(), os.Stdout)
+				},
+			},
+			{
 				Name:      "add",
 				Usage:     "add repos to an existing workspace",
 				ArgsUsage: "<name> <repo>...",
@@ -194,6 +206,45 @@ func RunSpaceExec(spaceName string, args []string, out io.Writer) error {
 	if len(failed) > 0 {
 		return fmt.Errorf("command failed in: %s", strings.Join(failed, ", "))
 	}
+	return nil
+}
+
+// =============================================================================
+// space push
+// =============================================================================
+
+// RunSpacePush pushes each repo's branch to origin in parallel.
+func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
+	sp, err := state.Load(spaceName)
+	if err != nil {
+		return fmt.Errorf("load space %q: %w", spaceName, err)
+	}
+
+	type pushResult struct {
+		name string
+		sym  string
+		msg  string
+	}
+	results := make([]pushResult, len(sp.Repos))
+
+	var g errgroup.Group
+	for i, r := range sp.Repos {
+		g.Go(func() error {
+			if err := runner.Push(r.WorktreePath, sp.Branch); err != nil {
+				results[i] = pushResult{r.Name, ui.SymFail, err.Error()}
+			} else {
+				results[i] = pushResult{r.Name, ui.SymOK, "pushed " + sp.Branch}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	tbl := ui.NewTableWriter(out)
+	for _, r := range results {
+		tbl.Row(r.name, r.sym+" "+r.msg)
+	}
+	tbl.Flush()
 	return nil
 }
 

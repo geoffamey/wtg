@@ -54,6 +54,7 @@ type Runner interface {
 	DefaultBranch(repoPath string) (string, error)
 	Fetch(repoPath string) error
 	FastForward(repoPath, branch string) error
+	Push(repoPath, branch string) error
 
 	// Info
 	RemoteURL(repoPath, remote string) (string, error)
