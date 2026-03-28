@@ -145,11 +145,7 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 					if c.NArg() == 0 {
 						return fmt.Errorf("missing required argument: <name>")
 					}
-					cfg, err := config.Load(c.String("config"))
-					if err != nil {
-						return err
-					}
-					return RunSpaceRebase(cfg, runner, c.Args().First(), os.Stdout)
+					return RunSpaceRebase(runner, c.Args().First(), os.Stdout)
 				},
 			},
 			{
@@ -276,7 +272,7 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 // onto origin's default branch, in parallel. Repos where rebase fails are
 // reported individually; the command itself returns nil so the caller can see
 // the full picture before acting.
-func RunSpaceRebase(cfg *config.Config, runner git.Runner, spaceName string, out io.Writer) error {
+func RunSpaceRebase(runner git.Runner, spaceName string, out io.Writer) error {
 	sp, err := state.Load(spaceName)
 	if err != nil {
 		return fmt.Errorf("load space %q: %w", spaceName, err)

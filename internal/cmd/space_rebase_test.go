@@ -9,11 +9,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/ui"
 )
-
-func rebaseCfg() *config.Config { return &config.Config{} }
 
 func TestRunSpaceRebase_RebasesAllRepos(t *testing.T) {
 	isolateState(t)
@@ -25,7 +22,7 @@ func TestRunSpaceRebase_RebasesAllRepos(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRebase(rebaseCfg(), r, "feat", &out); err != nil {
+	if err := RunSpaceRebase(r, "feat", &out); err != nil {
 		t.Fatalf("RunSpaceRebase: %v", err)
 	}
 	got := out.String()
@@ -50,7 +47,7 @@ func TestRunSpaceRebase_RebaseError(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRebase(rebaseCfg(), r, "feat", &out); err != nil {
+	if err := RunSpaceRebase(r, "feat", &out); err != nil {
 		t.Fatalf("RunSpaceRebase should not return error on rebase failure: %v", err)
 	}
 	got := out.String()
@@ -71,7 +68,7 @@ func TestRunSpaceRebase_DefaultBranchError(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRebase(rebaseCfg(), r, "feat", &out); err != nil {
+	if err := RunSpaceRebase(r, "feat", &out); err != nil {
 		t.Fatalf("RunSpaceRebase should not return error: %v", err)
 	}
 	got := out.String()
@@ -86,7 +83,7 @@ func TestRunSpaceRebase_DefaultBranchError(t *testing.T) {
 func TestRunSpaceRebase_UnknownSpace(t *testing.T) {
 	isolateState(t)
 	var out bytes.Buffer
-	if err := RunSpaceRebase(rebaseCfg(), &testRunner{}, "nonexistent", &out); err == nil {
+	if err := RunSpaceRebase(&testRunner{}, "nonexistent", &out); err == nil {
 		t.Fatal("expected error for unknown space")
 	}
 }
@@ -110,7 +107,7 @@ func TestRunSpaceRebase_Parallel(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- RunSpaceRebase(rebaseCfg(), r, "feat", io.Discard)
+			done <- RunSpaceRebase(r, "feat", io.Discard)
 		}()
 
 		synctest.Wait()
