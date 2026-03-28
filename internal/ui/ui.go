@@ -3,7 +3,6 @@ package ui
 
 import (
 	"io"
-	"os"
 	"text/tabwriter"
 
 	"github.com/charmbracelet/lipgloss"
@@ -30,11 +29,6 @@ var (
 // Columns are separated by \t; tabwriter handles alignment.
 type Table struct {
 	w *tabwriter.Writer
-}
-
-// NewTable returns a Table writing to stdout.
-func NewTable() *Table {
-	return NewTableWriter(os.Stdout)
 }
 
 // NewTableWriter returns a Table writing to w.
