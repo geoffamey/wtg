@@ -25,6 +25,6 @@ Each command includes unit tests (mock `Runner`) in the same session.
 
 ## Phase 3 — Polish
 
-- [ ] Shell completions (bash, zsh, fish)
+- [x] Shell completions (bash, zsh, fish)
 - [ ] CI (GitHub Actions: build + test)
 - [ ] Release workflow (goreleaser)

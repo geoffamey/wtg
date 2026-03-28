@@ -12,8 +12,9 @@ import (
 
 func main() {
 	app := &cli.App{
-		Name:  "wtg",
-		Usage: "manage multi-repo feature workflows using git worktrees and Go workspaces",
+		Name:                 "wtg",
+		Usage:                "manage multi-repo feature workflows using git worktrees and Go workspaces",
+		EnableBashCompletion: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "config",
@@ -26,6 +27,8 @@ func main() {
 			cmd.RepoCommand(git.New()),
 			cmd.SpaceCommand(git.New()),
 			cmd.StatusCommand(git.New()),
+			cmd.CompletionCommand(),
+			cmd.CompleteCommand(),
 		},
 	}
 
