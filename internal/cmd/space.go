@@ -28,6 +28,14 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 		Usage: "manage workspaces",
 		Subcommands: []*cli.Command{
 			{
+				Name:    "list",
+				Aliases: []string{"ls"},
+				Usage:   "list all spaces",
+				Action: func(c *cli.Context) error {
+					return RunSpaceList(os.Stdout)
+				},
+			},
+			{
 				Name:      "create",
 				Usage:     "create a new workspace",
 				ArgsUsage: "<name> [<repo>...]",
@@ -288,6 +296,23 @@ func writeGoWork(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod [
 	b.WriteString(")\n")
 
 	return os.WriteFile(goWorkPath, []byte(b.String()), 0o644)
+}
+
+// RunSpaceList prints a table of all spaces sorted by name. Each row shows the
+// space name, branch, workspace path, and number of repos.
+func RunSpaceList(out io.Writer) error {
+	spaces, err := state.List()
+	if err != nil {
+		return fmt.Errorf("list spaces: %w", err)
+	}
+	sort.Slice(spaces, func(i, j int) bool { return spaces[i].Name < spaces[j].Name })
+	tbl := ui.NewTableWriter(out)
+	for _, sp := range spaces {
+		repos := fmt.Sprintf("%d repos", len(sp.Repos))
+		tbl.Row(sp.Name, sp.Branch, sp.Path, repos)
+	}
+	tbl.Flush()
+	return nil
 }
 
 // buildSpaceState constructs the state.Space value to persist.
