@@ -591,6 +591,31 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 	if hadError {
 		return fmt.Errorf("some worktrees could not be removed; space %q not deleted from state", args.Name)
 	}
+
+	// Warn if the user's working directory is inside the space root; the shell
+	// will be left in a broken state after the directory is removed.
+	if cwd, err := os.Getwd(); err == nil {
+		if cwd == sp.Path || strings.HasPrefix(cwd, sp.Path+string(filepath.Separator)) {
+			fmt.Fprintf(out, "  %s your working directory is inside the space; cd elsewhere after deletion\n", ui.SymWarn)
+		}
+	}
+
+	// Remove the go.work file that was written into the space root. Failure here
+	// is reported but does not abort the delete — the state and worktrees are
+	// already gone.
+	if sp.GoWorkspace {
+		goWorkPath := filepath.Join(sp.Path, "go.work")
+		if err := os.Remove(goWorkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(out, "  %s could not remove go.work: %v\n", ui.SymWarn, err)
+		}
+	}
+
+	// Remove the space root directory. Only succeeds when empty; if the user
+	// placed other files there, report a warning so they can clean up manually.
+	if err := os.Remove(sp.Path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(out, "  %s could not remove space directory %s: %v\n", ui.SymWarn, sp.Path, err)
+	}
+
 	return state.Delete(args.Name)
 }
 
