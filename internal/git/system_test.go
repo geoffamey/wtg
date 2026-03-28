@@ -17,6 +17,7 @@ func runner() *git.SystemRunner { return git.New() }
 // --- WorktreeList / WorktreeAdd / WorktreeRemove ---
 
 func TestWorktreeAdd_NewBranch(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -44,6 +45,7 @@ func TestWorktreeAdd_NewBranch(t *testing.T) {
 }
 
 func TestWorktreeAdd_WithBase(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -74,6 +76,7 @@ func TestWorktreeAdd_WithBase(t *testing.T) {
 }
 
 func TestWorktreeAdd_ExistingBranch(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 	repo.CreateBranch("existing")
@@ -99,6 +102,7 @@ func TestWorktreeAdd_ExistingBranch(t *testing.T) {
 }
 
 func TestWorktreeRemove(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -116,6 +120,7 @@ func TestWorktreeRemove(t *testing.T) {
 }
 
 func TestWorktreeRemove_Force(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -135,6 +140,7 @@ func TestWorktreeRemove_Force(t *testing.T) {
 }
 
 func TestWorktreeList_MainWorktree(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	wts, err := runner().WorktreeList(repo.Path)
 	if err != nil {
@@ -158,6 +164,7 @@ func TestWorktreeList_MainWorktree(t *testing.T) {
 // --- BranchExists / BranchDelete / BranchMerged ---
 
 func TestBranchExists(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -179,6 +186,7 @@ func TestBranchExists(t *testing.T) {
 }
 
 func TestBranchDelete(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 	repo.CreateBranch("to-delete")
@@ -197,6 +205,7 @@ func TestBranchDelete(t *testing.T) {
 }
 
 func TestBranchDelete_Force(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -228,6 +237,7 @@ func TestBranchDelete_Force(t *testing.T) {
 }
 
 func TestBranchMerged(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -243,6 +253,7 @@ func TestBranchMerged(t *testing.T) {
 }
 
 func TestBranchMerged_NotMerged(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	r := runner()
 
@@ -266,6 +277,7 @@ func TestBranchMerged_NotMerged(t *testing.T) {
 // --- Status ---
 
 func TestStatus_Clean(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	s, err := runner().Status(repo.Path)
 	if err != nil {
@@ -280,6 +292,7 @@ func TestStatus_Clean(t *testing.T) {
 }
 
 func TestStatus_Dirty(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	repo.WriteFile("dirty.go", "package main\n")
 
@@ -301,6 +314,7 @@ func TestStatus_Dirty(t *testing.T) {
 // --- DefaultBranch / Fetch / FastForward ---
 
 func TestDefaultBranch(t *testing.T) {
+	t.Parallel()
 	local, _ := testhelper.InitWithRemote(t)
 	branch, err := runner().DefaultBranch(local.Path)
 	if err != nil {
@@ -312,6 +326,7 @@ func TestDefaultBranch(t *testing.T) {
 }
 
 func TestFetchAndFastForward(t *testing.T) {
+	t.Parallel()
 	local, remote := testhelper.InitWithRemote(t)
 	r := runner()
 
@@ -342,6 +357,7 @@ func TestFetchAndFastForward(t *testing.T) {
 // --- RemoteURL ---
 
 func TestRemoteURL(t *testing.T) {
+	t.Parallel()
 	local, remote := testhelper.InitWithRemote(t)
 	url, err := runner().RemoteURL(local.Path, "origin")
 	if err != nil {
@@ -355,6 +371,7 @@ func TestRemoteURL(t *testing.T) {
 // --- WorktreeRepair ---
 
 func TestWorktreeRepair_Supported(t *testing.T) {
+	t.Parallel()
 	repo := testhelper.Init(t)
 	// On any supported git version (≥ 2.29), repair with no args should be a no-op.
 	err := runner().WorktreeRepair(repo.Path)
