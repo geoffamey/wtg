@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/urfave/cli/v2"
 
@@ -30,6 +31,18 @@ func RepoCommand(runner git.Runner) *cli.Command {
 						return err
 					}
 					return RunDiscover(cfg, runner, os.Stdout)
+				},
+			},
+			{
+				Name:      "status",
+				Usage:     "show status of main repo clones",
+				ArgsUsage: "[<repo>...]",
+				Action: func(c *cli.Context) error {
+					cfg, err := config.Load(c.String("config"))
+					if err != nil {
+						return err
+					}
+					return RunRepoStatus(cfg, runner, c.Args().Slice(), os.Stdout)
 				},
 			},
 			{
@@ -201,4 +214,114 @@ func resolveRepoPath(rootDir, name string) (string, error) {
 		return "", fmt.Errorf("repo %q not found under %s", name, rootDir)
 	}
 	return p, nil
+}
+
+// RunRepoStatus prints a status table for all discovered repos (or the named
+// subset). Each row shows the repo name, current branch, working-tree state,
+// and ahead/behind counts relative to origin.
+func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.Writer) error {
+	if cfg.Discovery.RootDir == "" {
+		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
+	}
+
+	var paths []string
+	if len(args) == 0 {
+		discovered, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
+		if err != nil {
+			return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
+		}
+		paths = discovered
+		sort.Strings(paths)
+	} else {
+		for _, name := range args {
+			p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
+			if err != nil {
+				return err
+			}
+			paths = append(paths, p)
+		}
+	}
+
+	tbl := ui.NewTableWriter(out)
+	for _, p := range paths {
+		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+		tbl.Row(append([]string{name}, repoStatusCols(p, runner)...)...)
+	}
+	tbl.Flush()
+	return nil
+}
+
+// repoStatusCols returns the branch, status, and ahead/behind columns for one repo.
+func repoStatusCols(repoPath string, runner git.Runner) []string {
+	st, err := runner.Status(repoPath)
+	if err != nil {
+		return []string{ui.Fail.Render(ui.SymFail + " " + err.Error())}
+	}
+
+	defaultBranch, _ := runner.DefaultBranch(repoPath) // empty if no remote
+
+	return []string{
+		branchCol(st.Branch, defaultBranch),
+		statusCol(st.Files),
+		aheadBehindCol(st.Ahead, st.Behind, st.Upstream != ""),
+	}
+}
+
+// branchCol renders the branch name, highlighted if it differs from the default.
+func branchCol(branch, defaultBranch string) string {
+	if branch == "" {
+		return ui.Warn.Render("[(detached)]")
+	}
+	text := "[" + branch + "]"
+	if defaultBranch == "" || branch == defaultBranch {
+		return ui.Muted.Render(text)
+	}
+	return ui.Warn.Render(text)
+}
+
+// statusCol renders the working-tree state as a clean/dirty summary.
+func statusCol(files []git.FileStatus) string {
+	modified, untracked := classifyFiles(files)
+	if modified == 0 && untracked == 0 {
+		return ui.OK.Render(ui.SymOK + " clean")
+	}
+	var parts []string
+	if modified > 0 {
+		parts = append(parts, fmt.Sprintf("%d modified", modified))
+	}
+	if untracked > 0 {
+		parts = append(parts, fmt.Sprintf("%d untracked", untracked))
+	}
+	return ui.Fail.Render(ui.SymFail + " " + strings.Join(parts, ", "))
+}
+
+// aheadBehindCol renders ahead/behind counts. Returns an empty string if
+// the repo has no upstream tracking branch.
+// Colours: behind > 0 → yellow; both non-zero (diverged) → red.
+func aheadBehindCol(ahead, behind int, hasUpstream bool) string {
+	if !hasUpstream {
+		return ""
+	}
+	a := fmt.Sprintf("%s%d", ui.SymUp, ahead)
+	b := fmt.Sprintf("↓%d", behind)
+	switch {
+	case ahead > 0 && behind > 0:
+		return ui.Fail.Render(a + " " + b)
+	case behind > 0:
+		return a + " " + ui.Warn.Render(b)
+	default:
+		return a + " " + b
+	}
+}
+
+// classifyFiles counts modified (any non-untracked change) and untracked files.
+func classifyFiles(files []git.FileStatus) (modified, untracked int) {
+	for _, f := range files {
+		if f.Index == '?' && f.Worktree == '?' {
+			untracked++
+		} else {
+			modified++
+		}
+	}
+	return
 }
