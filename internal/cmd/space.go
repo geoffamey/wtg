@@ -254,10 +254,17 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
+	var failed []string
 	for _, r := range results {
 		tbl.Row(r.name, r.sym+" "+r.msg)
+		if r.sym == ui.SymFail {
+			failed = append(failed, r.name)
+		}
 	}
 	tbl.Flush()
+	if len(failed) > 0 {
+		return fmt.Errorf("push failed in: %s", strings.Join(failed, ", "))
+	}
 	return nil
 }
 
@@ -297,10 +304,17 @@ func RunSpaceRebase(runner git.Runner, spaceName string, out io.Writer) error {
 	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
 	tbl := ui.NewTableWriter(out)
+	var failed []string
 	for _, r := range results {
 		tbl.Row(r.name, r.sym+" "+r.msg)
+		if r.sym == ui.SymFail {
+			failed = append(failed, r.name)
+		}
 	}
 	tbl.Flush()
+	if len(failed) > 0 {
+		return fmt.Errorf("rebase failed in: %s", strings.Join(failed, ", "))
+	}
 	return nil
 }
 

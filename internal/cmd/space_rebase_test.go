@@ -47,8 +47,12 @@ func TestRunSpaceRebase_RebaseError(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRebase(r, "feat", &out); err != nil {
-		t.Fatalf("RunSpaceRebase should not return error on rebase failure: %v", err)
+	err := RunSpaceRebase(r, "feat", &out)
+	if err == nil {
+		t.Fatal("expected error when rebase fails")
+	}
+	if !strings.Contains(err.Error(), "rebase failed") {
+		t.Errorf("error should mention rebase failed: %v", err)
 	}
 	got := out.String()
 	if !strings.Contains(got, ui.SymFail) {
@@ -68,8 +72,9 @@ func TestRunSpaceRebase_DefaultBranchError(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRebase(r, "feat", &out); err != nil {
-		t.Fatalf("RunSpaceRebase should not return error: %v", err)
+	err := RunSpaceRebase(r, "feat", &out)
+	if err == nil {
+		t.Fatal("expected error when default branch detection fails")
 	}
 	got := out.String()
 	if !strings.Contains(got, ui.SymFail) {

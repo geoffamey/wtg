@@ -38,8 +38,12 @@ func TestRunSpacePush_PushError(t *testing.T) {
 	r := &testRunner{pushFn: func(string, string) error { return fmt.Errorf("rejected") }}
 
 	var out bytes.Buffer
-	if err := RunSpacePush(r, "feat", &out); err != nil {
-		t.Fatalf("RunSpacePush should not return error on push failure: %v", err)
+	err := RunSpacePush(r, "feat", &out)
+	if err == nil {
+		t.Fatal("expected error when push fails")
+	}
+	if !strings.Contains(err.Error(), "push failed") {
+		t.Errorf("error should mention push failed: %v", err)
 	}
 	got := out.String()
 	if !strings.Contains(got, ui.SymFail) {
