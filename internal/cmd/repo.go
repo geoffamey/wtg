@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffamey/wtg/internal/config"
@@ -28,13 +29,13 @@ func RepoCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:  "repo",
 		Usage: "manage repositories",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			{
-				Name:    "discover",
-				Aliases: []string{"list"},
-				Usage:   "scan discovery.root_dir for git repositories",
-				Action: func(c *cli.Context) error {
-					cfg, err := config.Load(c.String("config"))
+				Name:          "discover",
+				Aliases:       []string{"list"},
+				Usage:         "scan discovery.root_dir for git repositories",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := config.Load(cmd.String("config"))
 					if err != nil {
 						return err
 					}
@@ -42,39 +43,42 @@ func RepoCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
-				Name:      "status",
-				Usage:     "show status of main repo clones",
-				ArgsUsage: "[<repo>...]",
-				Action: func(c *cli.Context) error {
-					cfg, err := config.Load(c.String("config"))
+				Name:          "status",
+				Usage:         "show status of main repo clones",
+				ArgsUsage:     "[<repo>...]",
+				ShellComplete: completeRepos,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := config.Load(cmd.String("config"))
 					if err != nil {
 						return err
 					}
-					return RunRepoStatus(cfg, runner, c.Args().Slice(), os.Stdout)
+					return RunRepoStatus(cfg, runner, cmd.Args().Slice(), os.Stdout)
 				},
 			},
 			{
-				Name:      "fetch",
-				Usage:     "fetch from origin for all repos (no fast-forward)",
-				ArgsUsage: "[<repo>...]",
-				Action: func(c *cli.Context) error {
-					cfg, err := config.Load(c.String("config"))
+				Name:          "fetch",
+				Usage:         "fetch from origin for all repos (no fast-forward)",
+				ArgsUsage:     "[<repo>...]",
+				ShellComplete: completeRepos,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := config.Load(cmd.String("config"))
 					if err != nil {
 						return err
 					}
-					return RunFetch(cfg, runner, c.Args().Slice(), os.Stdout)
+					return RunFetch(cfg, runner, cmd.Args().Slice(), os.Stdout)
 				},
 			},
 			{
-				Name:      "sync",
-				Usage:     "fetch and fast-forward repos to origin's default branch",
-				ArgsUsage: "[<repo>...]",
-				Action: func(c *cli.Context) error {
-					cfg, err := config.Load(c.String("config"))
+				Name:          "sync",
+				Usage:         "fetch and fast-forward repos to origin's default branch",
+				ArgsUsage:     "[<repo>...]",
+				ShellComplete: completeRepos,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := config.Load(cmd.String("config"))
 					if err != nil {
 						return err
 					}
-					return RunSync(cfg, runner, c.Args().Slice(), os.Stdout)
+					return RunSync(cfg, runner, cmd.Args().Slice(), os.Stdout)
 				},
 			},
 		},

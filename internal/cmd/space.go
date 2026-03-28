@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/sync/errgroup"
 
@@ -31,19 +31,20 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:  "space",
 		Usage: "manage workspaces",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			{
 				Name:    "list",
 				Aliases: []string{"ls"},
 				Usage:   "list all spaces",
-				Action: func(c *cli.Context) error {
+				Action: func(ctx context.Context, cmd *cli.Command) error {
 					return RunSpaceList(os.Stdout)
 				},
 			},
 			{
-				Name:      "create",
-				Usage:     "create a new workspace",
-				ArgsUsage: "<name> [<repo>...]",
+				Name:          "create",
+				Usage:         "create a new workspace",
+				ArgsUsage:     "<name> [<repo>...]",
+				ShellComplete: completeRepos,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "branch",
@@ -58,28 +59,29 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 						Usage: "commit-ish to branch from (default: HEAD)",
 					},
 				},
-				Action: func(c *cli.Context) error {
-					if c.NArg() == 0 {
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() == 0 {
 						return fmt.Errorf("missing required argument: <name>")
 					}
-					cfg, err := config.Load(c.String("config"))
+					cfg, err := config.Load(cmd.Root().String("config"))
 					if err != nil {
 						return err
 					}
 					return RunSpaceCreate(cfg, runner, SpaceCreateArgs{
-						Name:   c.Args().First(),
-						Branch: c.String("branch"),
-						Path:   c.String("path"),
-						Base:   c.String("base"),
-						Repos:  c.Args().Tail(),
+						Name:   cmd.Args().First(),
+						Branch: cmd.String("branch"),
+						Path:   cmd.String("path"),
+						Base:   cmd.String("base"),
+						Repos:  cmd.Args().Tail(),
 					}, os.Stdout)
 				},
 			},
 			{
-				Name:      "delete",
-				Aliases:   []string{"rm"},
-				Usage:     "remove a workspace's worktrees and optionally delete its branches",
-				ArgsUsage: "<name>",
+				Name:          "delete",
+				Aliases:       []string{"rm"},
+				Usage:         "remove a workspace's worktrees and optionally delete its branches",
+				ArgsUsage:     "<name>",
+				ShellComplete: completeSpaces,
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Name:  "d",
@@ -90,26 +92,27 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 						Usage: "force-delete branch regardless of merge state",
 					},
 				},
-				Action: func(c *cli.Context) error {
-					if c.NArg() == 0 {
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() == 0 {
 						return fmt.Errorf("missing required argument: <name>")
 					}
 					return RunSpaceDelete(runner, SpaceDeleteArgs{
-						Name:         c.Args().First(),
-						DeleteBranch: c.Bool("d"),
-						ForceBranch:  c.Bool("D"),
+						Name:         cmd.Args().First(),
+						DeleteBranch: cmd.Bool("d"),
+						ForceBranch:  cmd.Bool("D"),
 					}, os.Stdin, os.Stdout)
 				},
 			},
 			{
-				Name:      "path",
-				Usage:     "print the root path of a space",
-				ArgsUsage: "<name>",
-				Action: func(c *cli.Context) error {
-					if c.NArg() == 0 {
+				Name:          "path",
+				Usage:         "print the root path of a space",
+				ArgsUsage:     "<name>",
+				ShellComplete: completeSpaces,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() == 0 {
 						return fmt.Errorf("missing required argument: <name>")
 					}
-					sp, err := state.Load(c.Args().First())
+					sp, err := state.Load(cmd.Args().First())
 					if err != nil {
 						return err
 					}
@@ -118,53 +121,57 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
-				Name:      "exec",
-				Usage:     "run a command in each worktree of a space",
-				ArgsUsage: "<name> <cmd> [<args>...]",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 2 {
+				Name:          "exec",
+				Usage:         "run a command in each worktree of a space",
+				ArgsUsage:     "<name> <cmd> [<args>...]",
+				ShellComplete: completeSpaces,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() < 2 {
 						return fmt.Errorf("usage: wtg space exec <name> <cmd> [<args>...]")
 					}
-					return RunSpaceExec(c.Args().First(), c.Args().Tail(), os.Stdout)
+					return RunSpaceExec(cmd.Args().First(), cmd.Args().Tail(), os.Stdout)
 				},
 			},
 			{
-				Name:      "push",
-				Usage:     "push all branches in a space to origin",
-				ArgsUsage: "<name>",
-				Action: func(c *cli.Context) error {
-					if c.NArg() == 0 {
+				Name:          "push",
+				Usage:         "push all branches in a space to origin",
+				ArgsUsage:     "<name>",
+				ShellComplete: completeSpaces,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() == 0 {
 						return fmt.Errorf("missing required argument: <name>")
 					}
-					return RunSpacePush(runner, c.Args().First(), os.Stdout)
+					return RunSpacePush(runner, cmd.Args().First(), os.Stdout)
 				},
 			},
 			{
-				Name:      "rebase",
-				Usage:     "rebase all worktrees in a space onto origin's default branch",
-				ArgsUsage: "<name>",
-				Action: func(c *cli.Context) error {
-					if c.NArg() == 0 {
+				Name:          "rebase",
+				Usage:         "rebase all worktrees in a space onto origin's default branch",
+				ArgsUsage:     "<name>",
+				ShellComplete: completeSpaces,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() == 0 {
 						return fmt.Errorf("missing required argument: <name>")
 					}
-					return RunSpaceRebase(runner, c.Args().First(), os.Stdout)
+					return RunSpaceRebase(runner, cmd.Args().First(), os.Stdout)
 				},
 			},
 			{
-				Name:      "add",
-				Usage:     "add repos to an existing workspace",
-				ArgsUsage: "<name> <repo>...",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 2 {
+				Name:          "add",
+				Usage:         "add repos to an existing workspace",
+				ArgsUsage:     "<name> <repo>...",
+				ShellComplete: completeRepos,
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Args().Len() < 2 {
 						return fmt.Errorf("usage: wtg space add <name> <repo>")
 					}
-					cfg, err := config.Load(c.String("config"))
+					cfg, err := config.Load(cmd.Root().String("config"))
 					if err != nil {
 						return err
 					}
 					return RunSpaceAdd(cfg, runner, SpaceAddArgs{
-						Name:  c.Args().First(),
-						Repos: c.Args().Tail(),
+						Name:  cmd.Args().First(),
+						Repos: cmd.Args().Tail(),
 					}, os.Stdout)
 				},
 			},

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffamey/wtg/internal/git"
@@ -20,17 +21,18 @@ import (
 // StatusCommand returns the top-level `wtg status` command.
 func StatusCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:      "status",
-		Usage:     "show status of all workspace worktrees",
-		ArgsUsage: "[<space>]",
+		Name:          "status",
+		Usage:         "show status of all workspace worktrees",
+		ArgsUsage:     "[<space>]",
+		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "detailed",
 				Usage: "show individual modified files per repo",
 			},
 		},
-		Action: func(c *cli.Context) error {
-			return RunStatus(runner, c.Args().Slice(), c.Bool("detailed"), os.Stdout)
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			return RunStatus(runner, cmd.Args().Slice(), cmd.Bool("detailed"), os.Stdout)
 		},
 	}
 }

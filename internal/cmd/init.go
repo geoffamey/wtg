@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.yaml.in/yaml/v3"
 
 	"github.com/geoffamey/wtg/internal/config"
@@ -19,8 +20,8 @@ func InitCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "init",
 		Usage: "interactive setup wizard — creates the wtg config file",
-		Action: func(c *cli.Context) error {
-			cfgPath := c.String("config")
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			cfgPath := cmd.String("config")
 			if cfgPath == "" {
 				cfgPath = config.DefaultPath()
 			}
