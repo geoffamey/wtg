@@ -3,8 +3,11 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/ui"
@@ -148,10 +151,10 @@ func TestRunSync_AllRepos(t *testing.T) {
 	makeRepo(t, root, "frontend")
 
 	clean := git.RepoStatus{Branch: "main"}
-	calls := 0
+	var calls atomic.Int32
 	r := &testRunner{
 		defaultBranchFn: func(string) (string, error) { return "main", nil },
-		statusFn:        func(string) (git.RepoStatus, error) { calls++; return clean, nil },
+		statusFn:        func(string) (git.RepoStatus, error) { calls.Add(1); return clean, nil },
 		fetchFn:         func(string) error { return nil },
 		fastForwardFn:   func(string, string) error { return nil },
 	}
@@ -160,6 +163,81 @@ func TestRunSync_AllRepos(t *testing.T) {
 	if !strings.Contains(got, "api") || !strings.Contains(got, "frontend") {
 		t.Errorf("output missing repo names: %q", got)
 	}
+}
+
+func TestRunSync_Parallel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		root := t.TempDir()
+		makeRepo(t, root, "api")
+		makeRepo(t, root, "svc")
+		makeRepo(t, root, "web")
+
+		gate := make(chan struct{})
+		var started atomic.Int32
+
+		r := &testRunner{
+			defaultBranchFn: func(string) (string, error) { return "main", nil },
+			statusFn:        func(string) (git.RepoStatus, error) { return git.RepoStatus{Branch: "main"}, nil },
+			fetchFn: func(string) error {
+				started.Add(1)
+				<-gate
+				return nil
+			},
+		}
+
+		done := make(chan error, 1)
+		go func() {
+			done <- RunSync(discoverCfg(root, 1), r, nil, io.Discard)
+		}()
+
+		synctest.Wait()
+
+		if n := started.Load(); n != 3 {
+			t.Errorf("expected 3 concurrent fetches before any completed, got %d", n)
+		}
+
+		close(gate)
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestRunRepoStatus_Parallel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		root := t.TempDir()
+		makeRepo(t, root, "api")
+		makeRepo(t, root, "svc")
+		makeRepo(t, root, "web")
+
+		gate := make(chan struct{})
+		var started atomic.Int32
+
+		r := &testRunner{
+			statusFn: func(string) (git.RepoStatus, error) {
+				started.Add(1)
+				<-gate
+				return git.RepoStatus{Branch: "main"}, nil
+			},
+			defaultBranchFn: func(string) (string, error) { return "main", nil },
+		}
+
+		done := make(chan error, 1)
+		go func() {
+			done <- RunRepoStatus(discoverCfg(root, 1), r, nil, io.Discard)
+		}()
+
+		synctest.Wait()
+
+		if n := started.Load(); n != 3 {
+			t.Errorf("expected 3 concurrent status calls before any completed, got %d", n)
+		}
+
+		close(gate)
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestRunSync_NamedRepos(t *testing.T) {

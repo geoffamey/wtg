@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
@@ -151,11 +152,27 @@ func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer
 		}
 	}
 
+	type syncResult struct {
+		name string
+		sym  string
+		msg  string
+	}
+	results := make([]syncResult, len(paths))
+
+	var g errgroup.Group
+	for i, p := range paths {
+		g.Go(func() error {
+			name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+			sym, msg := syncOne(p, runner)
+			results[i] = syncResult{name, sym, msg}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
 	tbl := ui.NewTableWriter(out)
-	for _, p := range paths {
-		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
-		sym, msg := syncOne(p, runner)
-		tbl.Row(name, sym+" "+msg)
+	for _, r := range results {
+		tbl.Row(r.name, r.sym+" "+r.msg)
 	}
 	tbl.Flush()
 	return nil
@@ -242,10 +259,25 @@ func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.
 		}
 	}
 
+	type statusResult struct {
+		name string
+		cols []string
+	}
+	results := make([]statusResult, len(paths))
+
+	var g errgroup.Group
+	for i, p := range paths {
+		g.Go(func() error {
+			name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+			results[i] = statusResult{name, repoStatusCols(p, runner)}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
 	tbl := ui.NewTableWriter(out)
-	for _, p := range paths {
-		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
-		tbl.Row(append([]string{name}, repoStatusCols(p, runner)...)...)
+	for _, r := range results {
+		tbl.Row(append([]string{r.name}, r.cols...)...)
 	}
 	tbl.Flush()
 	return nil
