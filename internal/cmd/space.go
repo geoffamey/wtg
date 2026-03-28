@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -109,6 +110,17 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
+				Name:      "exec",
+				Usage:     "run a command in each worktree of a space",
+				ArgsUsage: "<name> <cmd> [<args>...]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 2 {
+						return fmt.Errorf("usage: wtg space exec <name> <cmd> [<args>...]")
+					}
+					return RunSpaceExec(c.Args().First(), c.Args().Tail(), os.Stdout)
+				},
+			},
+			{
 				Name:      "add",
 				Usage:     "add repos to an existing workspace",
 				ArgsUsage: "<name> <repo>...",
@@ -151,6 +163,37 @@ func RunSpaceList(out io.Writer) error {
 		tbl.Row(sp.Name, sp.Branch, sp.Path, fmt.Sprintf("%d repos", len(sp.Repos)), strings.Join(names, ", "))
 	}
 	tbl.Flush()
+	return nil
+}
+
+// =============================================================================
+// space exec
+// =============================================================================
+
+// RunSpaceExec runs a command in each worktree of the named space sequentially,
+// streaming output as it goes. A header line identifies each repo. Execution
+// continues even if a command fails; failed repos are reported at the end.
+func RunSpaceExec(spaceName string, args []string, out io.Writer) error {
+	sp, err := state.Load(spaceName)
+	if err != nil {
+		return fmt.Errorf("load space %q: %w", spaceName, err)
+	}
+
+	var failed []string
+	for _, r := range sp.Repos {
+		fmt.Fprintf(out, "=== %s ===\n", r.Name)
+		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
+		cmd.Dir = r.WorktreePath
+		cmd.Stdout = out
+		cmd.Stderr = out
+		if err := cmd.Run(); err != nil {
+			failed = append(failed, r.Name)
+		}
+	}
+
+	if len(failed) > 0 {
+		return fmt.Errorf("command failed in: %s", strings.Join(failed, ", "))
+	}
 	return nil
 }
 
