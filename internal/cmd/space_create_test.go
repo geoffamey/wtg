@@ -518,6 +518,63 @@ func TestRunSpaceCreate_GoWork(t *testing.T) {
 	if strings.Contains(content, "frontend") {
 		t.Errorf("go.work should not reference frontend (no go.mod): %q", content)
 	}
+	// go directive should be read from the module's go.mod, not hardcoded.
+	if !strings.Contains(content, "go 1.24") {
+		t.Errorf("go.work should carry go version from go.mod: %q", content)
+	}
+}
+
+func TestRunSpaceCreate_GoWork_MaxVersion(t *testing.T) {
+	// When multiple modules declare different go versions, the highest wins.
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	for name, ver := range map[string]string{"api": "1.22", "svc": "1.24", "lib": "1.21"} {
+		p := makeRepo(t, root, name)
+		if err := os.WriteFile(filepath.Join(p, "go.mod"),
+			[]byte("module example.com/"+name+"\n\ngo "+ver+"\n"), 0o644); err != nil {
+			t.Fatalf("write go.mod: %v", err)
+		}
+	}
+
+	cfg := spaceCreateCfg(root, spacesRoot)
+	var out bytes.Buffer
+	if err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceCreate: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(spacesRoot, "feat", "go.work"))
+	if err != nil {
+		t.Fatalf("go.work not written: %v", err)
+	}
+	if !strings.Contains(string(data), "go 1.24") {
+		t.Errorf("go.work should use max go version (1.24): %q", string(data))
+	}
+}
+
+func TestCmpGoVersion(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want int // sign only: <0, 0, >0
+	}{
+		{"1.21", "1.21", 0},
+		{"1.22", "1.21", 1},
+		{"1.21", "1.22", -1},
+		{"1.21.0", "1.21", 0},
+		{"1.21.1", "1.21.0", 1},
+		{"1.24", "1.9", 1},
+	}
+	for _, c := range cases {
+		got := cmpGoVersion(c.a, c.b)
+		switch {
+		case c.want == 0 && got != 0:
+			t.Errorf("cmpGoVersion(%q, %q) = %d, want 0", c.a, c.b, got)
+		case c.want > 0 && got <= 0:
+			t.Errorf("cmpGoVersion(%q, %q) = %d, want >0", c.a, c.b, got)
+		case c.want < 0 && got >= 0:
+			t.Errorf("cmpGoVersion(%q, %q) = %d, want <0", c.a, c.b, got)
+		}
+	}
 }
 
 func TestRunSpaceCreate_GoWorkRemovedOnRollback(t *testing.T) {

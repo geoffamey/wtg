@@ -11,10 +11,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"golang.org/x/mod/modfile"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/geoffamey/wtg/internal/config"
@@ -366,7 +368,8 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 	}
 	goWorkPath := filepath.Join(spacePath, "go.work")
 	if anyGoMod {
-		steps = append(steps, goWorkStep(goWorkPath, spacePath, targets, hasGoMod))
+		goVersion := detectGoVersion(targets, hasGoMod)
+		steps = append(steps, goWorkStep(goWorkPath, spacePath, targets, hasGoMod, goVersion))
 	}
 
 	savedState := false
@@ -463,7 +466,8 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 
 	goWorkPath := filepath.Join(sp.Path, "go.work")
 	if anyGoMod {
-		steps = append(steps, goWorkStep(goWorkPath, sp.Path, allTargets, hasGoMod))
+		goVersion := detectGoVersion(allTargets, hasGoMod)
+		steps = append(steps, goWorkStep(goWorkPath, sp.Path, allTargets, hasGoMod, goVersion))
 	}
 
 	oldState := *sp
@@ -685,6 +689,57 @@ func detectGoMods(targets []*repoTarget) (hasGoMod []bool, anyGoMod bool) {
 	return
 }
 
+// goWorkFallbackVersion is used when no go.mod declares a go directive.
+// go.work files were introduced in Go 1.18; 1.21 is a safe modern baseline.
+const goWorkFallbackVersion = "1.21"
+
+// detectGoVersion returns the maximum go directive version found across all
+// targets that have a go.mod, falling back to goWorkFallbackVersion.
+func detectGoVersion(targets []*repoTarget, hasGoMod []bool) string {
+	best := ""
+	for i, t := range targets {
+		if !hasGoMod[i] {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(t.repoPath, "go.mod"))
+		if err != nil {
+			continue
+		}
+		f, err := modfile.Parse("go.mod", data, nil)
+		if err != nil || f.Go == nil {
+			continue
+		}
+		if best == "" || cmpGoVersion(f.Go.Version, best) > 0 {
+			best = f.Go.Version
+		}
+	}
+	if best == "" {
+		return goWorkFallbackVersion
+	}
+	return best
+}
+
+// cmpGoVersion compares two go directive version strings (e.g. "1.21", "1.22.1").
+// Returns a positive value if a > b, negative if a < b, zero if equal.
+func cmpGoVersion(a, b string) int {
+	aParts := strings.SplitN(a, ".", 3)
+	bParts := strings.SplitN(b, ".", 3)
+	for len(aParts) < 3 {
+		aParts = append(aParts, "0")
+	}
+	for len(bParts) < 3 {
+		bParts = append(bParts, "0")
+	}
+	for i := range 3 {
+		an, _ := strconv.Atoi(aParts[i])
+		bn, _ := strconv.Atoi(bParts[i])
+		if an != bn {
+			return an - bn
+		}
+	}
+	return 0
+}
+
 // worktreeStep returns a saga.Step that creates a linked worktree and undoes it
 // on rollback (also deleting the branch if it was newly created).
 func worktreeStep(runner git.Runner, t *repoTarget, branch, base string) saga.Step {
@@ -710,13 +765,13 @@ func worktreeStep(runner git.Runner, t *repoTarget, branch, base string) saga.St
 
 // goWorkStep returns a saga.Step that writes a go.work and restores the prior
 // content (or removes the file) on rollback.
-func goWorkStep(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool) saga.Step {
+func goWorkStep(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool, goVersion string) saga.Step {
 	// Capture existing content before the saga runs so undo can restore it.
 	oldContent, _ := os.ReadFile(goWorkPath)
 	return saga.Step{
 		Name: "write go.work",
 		Do: func(ctx context.Context) error {
-			return writeGoWork(goWorkPath, spacePath, targets, hasGoMod)
+			return writeGoWork(goWorkPath, spacePath, targets, hasGoMod, goVersion)
 		},
 		Undo: func(ctx context.Context) error {
 			if oldContent != nil {
@@ -732,7 +787,8 @@ func goWorkStep(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []
 
 // writeGoWork writes a go.work file at goWorkPath with a use directive for
 // each repo that has a go.mod. hasGoMod[i] corresponds to targets[i].
-func writeGoWork(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool) error {
+// goVersion is written as the go directive (e.g. "1.24").
+func writeGoWork(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool, goVersion string) error {
 	var usePaths []string
 	for i, t := range targets {
 		if !hasGoMod[i] {
@@ -749,7 +805,7 @@ func writeGoWork(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod [
 	}
 
 	var b strings.Builder
-	b.WriteString("go 1.24\n\nuse (\n")
+	b.WriteString("go " + goVersion + "\n\nuse (\n")
 	for _, p := range usePaths {
 		b.WriteString("\t" + p + "\n")
 	}
