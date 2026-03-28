@@ -3,7 +3,9 @@ package git_test
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/geoffamey/wtg/internal/git"
@@ -19,7 +21,7 @@ func TestWorktreeAdd_NewBranch(t *testing.T) {
 	r := runner()
 
 	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", true); err != nil {
+	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", "", true); err != nil {
 		t.Fatalf("WorktreeAdd: %v", err)
 	}
 
@@ -41,13 +43,43 @@ func TestWorktreeAdd_NewBranch(t *testing.T) {
 	}
 }
 
+func TestWorktreeAdd_WithBase(t *testing.T) {
+	repo := testhelper.Init(t)
+	r := runner()
+
+	// Add a second commit so we can branch from the first (parent) commit.
+	repo.Commit("second commit")
+
+	// Resolve the parent commit hash using exec.Command since run() is unexported.
+	out, err := exec.Command("git", "-C", repo.Path, "rev-parse", "HEAD~1").Output()
+	if err != nil {
+		t.Fatalf("rev-parse HEAD~1: %v", err)
+	}
+	parentHash := strings.TrimSpace(string(out))
+
+	wtPath := filepath.Join(t.TempDir(), "wt")
+	if err := r.WorktreeAdd(repo.Path, wtPath, "based", parentHash, true); err != nil {
+		t.Fatalf("WorktreeAdd with base: %v", err)
+	}
+
+	// The worktree's HEAD should be at the parent, not the latest commit.
+	wtOut, err := exec.Command("git", "-C", wtPath, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("rev-parse wt HEAD: %v", err)
+	}
+	wtHEAD := strings.TrimSpace(string(wtOut))
+	if wtHEAD != parentHash {
+		t.Errorf("worktree HEAD: got %q, want parent %q", wtHEAD, parentHash)
+	}
+}
+
 func TestWorktreeAdd_ExistingBranch(t *testing.T) {
 	repo := testhelper.Init(t)
 	r := runner()
 	repo.CreateBranch("existing")
 
 	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := r.WorktreeAdd(repo.Path, wtPath, "existing", false); err != nil {
+	if err := r.WorktreeAdd(repo.Path, wtPath, "existing", "", false); err != nil {
 		t.Fatalf("WorktreeAdd existing branch: %v", err)
 	}
 
@@ -71,7 +103,7 @@ func TestWorktreeRemove(t *testing.T) {
 	r := runner()
 
 	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", true); err != nil {
+	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", "", true); err != nil {
 		t.Fatalf("WorktreeAdd: %v", err)
 	}
 	if err := r.WorktreeRemove(repo.Path, wtPath, false); err != nil {
@@ -88,7 +120,7 @@ func TestWorktreeRemove_Force(t *testing.T) {
 	r := runner()
 
 	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", true); err != nil {
+	if err := r.WorktreeAdd(repo.Path, wtPath, "feature", "", true); err != nil {
 		t.Fatalf("WorktreeAdd: %v", err)
 	}
 	// Write an untracked file to make the worktree dirty, requiring --force.
@@ -170,7 +202,7 @@ func TestBranchDelete_Force(t *testing.T) {
 
 	// Add a commit on a worktree so the branch is unmerged, requiring -D.
 	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := r.WorktreeAdd(repo.Path, wtPath, "unmerged", true); err != nil {
+	if err := r.WorktreeAdd(repo.Path, wtPath, "unmerged", "", true); err != nil {
 		t.Fatalf("WorktreeAdd: %v", err)
 	}
 	testhelper.RepoAt(t, wtPath).Commit("unmerged commit")
@@ -216,7 +248,7 @@ func TestBranchMerged_NotMerged(t *testing.T) {
 
 	// Create a worktree on a new branch, add a commit — branch is ahead of main.
 	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := r.WorktreeAdd(repo.Path, wtPath, "ahead-branch", true); err != nil {
+	if err := r.WorktreeAdd(repo.Path, wtPath, "ahead-branch", "", true); err != nil {
 		t.Fatalf("WorktreeAdd: %v", err)
 	}
 	wt := testhelper.RepoAt(t, wtPath)

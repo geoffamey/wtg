@@ -56,11 +56,14 @@ func exitCode(err error) int {
 
 // --- Worktrees ---
 
-func (r *SystemRunner) WorktreeAdd(repoPath, worktreePath, branch string, createBranch bool) error {
+func (r *SystemRunner) WorktreeAdd(repoPath, worktreePath, branch, base string, createBranch bool) error {
 	var args []string
 	if createBranch {
-		// git worktree add -b <new-branch> <path>
+		// git worktree add -b <new-branch> <path> [<base>]
 		args = []string{"worktree", "add", "-b", branch, worktreePath}
+		if base != "" {
+			args = append(args, base)
+		}
 	} else {
 		// git worktree add <path> <branch>
 		args = []string{"worktree", "add", worktreePath, branch}

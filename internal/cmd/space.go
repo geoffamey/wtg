@@ -51,6 +51,10 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 						Name:  "path",
 						Usage: "workspace root path (default: <spaces.root_dir>/<name>)",
 					},
+					&cli.StringFlag{
+						Name:  "base",
+						Usage: "commit-ish to branch from (default: HEAD)",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if c.NArg() == 0 {
@@ -64,6 +68,7 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 						Name:   c.Args().First(),
 						Branch: c.String("branch"),
 						Path:   c.String("path"),
+						Base:   c.String("base"),
 						Repos:  c.Args().Tail(),
 					}, os.Stdout)
 				},
@@ -257,6 +262,7 @@ type SpaceCreateArgs struct {
 	Name   string
 	Branch string   // overrides cfg.Git.BranchPrefix+Name when set
 	Path   string   // overrides cfg.Spaces.RootDir/Name when set
+	Base   string   // commit-ish to branch from (default: HEAD)
 	Repos  []string // short names; empty = all discovered repos
 }
 
@@ -307,7 +313,7 @@ func RunSpaceCreate(cfg *config.Config, runner git.Runner, args SpaceCreateArgs,
 
 	var steps []saga.Step
 	for i := range targets {
-		steps = append(steps, worktreeStep(runner, targets[i], branch))
+		steps = append(steps, worktreeStep(runner, targets[i], branch, args.Base))
 	}
 	goWorkPath := filepath.Join(spacePath, "go.work")
 	if anyGoMod {
@@ -403,7 +409,7 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 
 	var steps []saga.Step
 	for i := range newTargets {
-		steps = append(steps, worktreeStep(runner, newTargets[i], sp.Branch))
+		steps = append(steps, worktreeStep(runner, newTargets[i], sp.Branch, ""))
 	}
 
 	goWorkPath := filepath.Join(sp.Path, "go.work")
@@ -632,14 +638,14 @@ func detectGoMods(targets []*repoTarget) (hasGoMod []bool, anyGoMod bool) {
 
 // worktreeStep returns a saga.Step that creates a linked worktree and undoes it
 // on rollback (also deleting the branch if it was newly created).
-func worktreeStep(runner git.Runner, t *repoTarget, branch string) saga.Step {
+func worktreeStep(runner git.Runner, t *repoTarget, branch, base string) saga.Step {
 	return saga.Step{
 		Name: fmt.Sprintf("create worktree %s", t.name),
 		Do: func(ctx context.Context) error {
 			if err := os.MkdirAll(filepath.Dir(t.worktreePath), 0o755); err != nil {
 				return fmt.Errorf("create parent dir: %w", err)
 			}
-			return runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, t.createBranch)
+			return runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, base, t.createBranch)
 		},
 		Undo: func(ctx context.Context) error {
 			if err := runner.WorktreeRemove(t.repoPath, t.worktreePath, true); err != nil {

@@ -31,7 +31,7 @@ func isolateState(t *testing.T) {
 func createRunner() *testRunner {
 	return &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn:  func(_, _, _ string, _ bool) error { return nil },
+		worktreeAddFn:  func(_, _, _, _ string, _ bool) error { return nil },
 	}
 }
 
@@ -164,7 +164,7 @@ func TestRunSpaceCreate_ExistingBranchNotCheckedOut(t *testing.T) {
 				{Path: "/repo/api", Branch: "main"},
 			}, nil
 		},
-		worktreeAddFn: func(_, _, _ string, create bool) error {
+		worktreeAddFn: func(_, _, _, _ string, create bool) error {
 			createBranch = create
 			return nil
 		},
@@ -191,7 +191,7 @@ func TestRunSpaceCreate_Success(t *testing.T) {
 	var added [][2]string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn: func(repoPath, worktreePath, _ string, _ bool) error {
+		worktreeAddFn: func(repoPath, worktreePath, _, _ string, _ bool) error {
 			added = append(added, [2]string{repoPath, worktreePath})
 			return nil
 		},
@@ -231,7 +231,7 @@ func TestRunSpaceCreate_DefaultBranch(t *testing.T) {
 	var usedBranch string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn: func(_, _, branch string, _ bool) error {
+		worktreeAddFn: func(_, _, branch, _ string, _ bool) error {
 			usedBranch = branch
 			return nil
 		},
@@ -246,6 +246,54 @@ func TestRunSpaceCreate_DefaultBranch(t *testing.T) {
 	}
 }
 
+func TestRunSpaceCreate_BaseFlag(t *testing.T) {
+	root := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	cfg := spaceCreateCfg(root, t.TempDir())
+
+	var gotBase string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, _, _, base string, _ bool) error {
+			gotBase = base
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat", Base: "origin/main"}, &out); err != nil {
+		t.Fatalf("RunSpaceCreate: %v", err)
+	}
+	if gotBase != "origin/main" {
+		t.Errorf("base: got %q, want %q", gotBase, "origin/main")
+	}
+}
+
+func TestRunSpaceCreate_NoBase_PassesEmpty(t *testing.T) {
+	root := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	cfg := spaceCreateCfg(root, t.TempDir())
+
+	var gotBase string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, _, _, base string, _ bool) error {
+			gotBase = base
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceCreate: %v", err)
+	}
+	if gotBase != "" {
+		t.Errorf("base should be empty when not set, got %q", gotBase)
+	}
+}
+
 func TestRunSpaceCreate_NamedRepos(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
@@ -256,7 +304,7 @@ func TestRunSpaceCreate_NamedRepos(t *testing.T) {
 	var added []string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn: func(repoPath, _, _ string, _ bool) error {
+		worktreeAddFn: func(repoPath, _, _, _ string, _ bool) error {
 			added = append(added, repoPath)
 			return nil
 		},
@@ -287,7 +335,7 @@ func TestRunSpaceCreate_RollbackOnFailure(t *testing.T) {
 	var removed []string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn: func(_, worktreePath, _ string, _ bool) error {
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
 			addCount++
 			if addCount == 2 {
 				return fmt.Errorf("disk full")
@@ -330,7 +378,7 @@ func TestRunSpaceCreate_RollbackDeletesCreatedBranch(t *testing.T) {
 	var deletedBranches []string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil }, // new branch
-		worktreeAddFn: func(_, _, _ string, _ bool) error {
+		worktreeAddFn: func(_, _, _, _ string, _ bool) error {
 			addCount++
 			if addCount == 2 {
 				return fmt.Errorf("disk full")
@@ -367,7 +415,7 @@ func TestRunSpaceCreate_RollbackPreservesExistingBranch(t *testing.T) {
 		worktreeListFn: func(_ string) ([]git.WorktreeInfo, error) {
 			return []git.WorktreeInfo{{Path: "/repo", Branch: "main"}}, nil
 		},
-		worktreeAddFn: func(_, _, _ string, _ bool) error {
+		worktreeAddFn: func(_, _, _, _ string, _ bool) error {
 			addCount++
 			if addCount == 2 {
 				return fmt.Errorf("disk full")
@@ -402,7 +450,7 @@ func TestRunSpaceCreate_NestedRepoLayout(t *testing.T) {
 	var worktreePaths []string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn: func(_, worktreePath, _ string, _ bool) error {
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
 			worktreePaths = append(worktreePaths, worktreePath)
 			return nil
 		},

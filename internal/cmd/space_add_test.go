@@ -118,7 +118,7 @@ func TestRunSpaceAdd_Success(t *testing.T) {
 	var added []string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn: func(_, worktreePath, _ string, _ bool) error {
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
 			added = append(added, worktreePath)
 			return nil
 		},
@@ -156,7 +156,7 @@ func TestRunSpaceAdd_UsesSpaceBranch(t *testing.T) {
 	var usedBranch string
 	r := &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn:  func(_, _, branch string, _ bool) error { usedBranch = branch; return nil },
+		worktreeAddFn:  func(_, _, branch, _ string, _ bool) error { usedBranch = branch; return nil },
 	}
 
 	var out bytes.Buffer
@@ -234,7 +234,7 @@ func TestRunSpaceAdd_RollbackRestoresState(t *testing.T) {
 
 	r := &testRunner{
 		branchExistsFn:   func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn:    func(_, _, _ string, _ bool) error { return fmt.Errorf("disk full") },
+		worktreeAddFn:    func(_, _, _, _ string, _ bool) error { return fmt.Errorf("disk full") },
 		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
 		branchDeleteFn:   func(_, _ string, _ bool) error { return nil },
 	}
@@ -291,7 +291,7 @@ func TestRunSpaceAdd_RollbackRestoresGoWork(t *testing.T) {
 	cfg := spaceCreateCfg(root, spacesRoot)
 	r := &testRunner{
 		branchExistsFn:   func(_, _ string) (bool, error) { return false, nil },
-		worktreeAddFn:    func(_, _, _ string, _ bool) error { return nil },
+		worktreeAddFn:    func(_, _, _, _ string, _ bool) error { return nil },
 		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
 		branchDeleteFn:   func(_, _ string, _ bool) error { return nil },
 	}

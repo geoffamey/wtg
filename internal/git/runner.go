@@ -37,7 +37,7 @@ var ErrRepairUnsupported = errors.New("git worktree repair requires git ≥ 2.29
 // real git repo created with internal/git/testhelper.
 type Runner interface {
 	// Worktrees
-	WorktreeAdd(repoPath, worktreePath, branch string, createBranch bool) error
+	WorktreeAdd(repoPath, worktreePath, branch, base string, createBranch bool) error
 	WorktreeRemove(repoPath, worktreePath string, force bool) error
 	WorktreeList(repoPath string) ([]WorktreeInfo, error)
 	WorktreeRepair(repoPath string, paths ...string) error // ErrRepairUnsupported on git < 2.29

@@ -10,7 +10,7 @@ import (
 // Only set the function fields your test actually needs; unset fields panic
 // with a descriptive message if called unexpectedly.
 type testRunner struct {
-	worktreeAddFn    func(repoPath, worktreePath, branch string, createBranch bool) error
+	worktreeAddFn    func(repoPath, worktreePath, branch, base string, createBranch bool) error
 	worktreeRemoveFn func(repoPath, worktreePath string, force bool) error
 	worktreeListFn   func(repoPath string) ([]git.WorktreeInfo, error)
 	worktreeRepairFn func(repoPath string, paths ...string) error
@@ -25,11 +25,11 @@ type testRunner struct {
 	remoteURLFn      func(repoPath, remote string) (string, error)
 }
 
-func (r *testRunner) WorktreeAdd(repoPath, worktreePath, branch string, createBranch bool) error {
+func (r *testRunner) WorktreeAdd(repoPath, worktreePath, branch, base string, createBranch bool) error {
 	if r.worktreeAddFn == nil {
-		panic(fmt.Sprintf("unexpected WorktreeAdd(%q, %q, %q, %v)", repoPath, worktreePath, branch, createBranch))
+		panic(fmt.Sprintf("unexpected WorktreeAdd(%q, %q, %q, %q, %v)", repoPath, worktreePath, branch, base, createBranch))
 	}
-	return r.worktreeAddFn(repoPath, worktreePath, branch, createBranch)
+	return r.worktreeAddFn(repoPath, worktreePath, branch, base, createBranch)
 }
 
 func (r *testRunner) WorktreeRemove(repoPath, worktreePath string, force bool) error {
