@@ -17,7 +17,7 @@ Each command includes unit tests (mock `Runner`) in the same session.
 - [x] `wtg init`
 - [x] `wtg repo discover` / `wtg repo list`
 - [x] `wtg repo sync`
-- [ ] `wtg space create`
+- [x] `wtg space create`
 - [ ] `wtg space list`
 - [ ] `wtg space add`
 - [ ] `wtg space delete`

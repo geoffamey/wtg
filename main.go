@@ -24,6 +24,7 @@ func main() {
 		Commands: []*cli.Command{
 			cmd.InitCommand(),
 			cmd.RepoCommand(git.New()),
+			cmd.SpaceCommand(git.New()),
 		},
 	}
 
