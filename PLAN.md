@@ -21,6 +21,7 @@ Each command includes unit tests (mock `Runner`) in the same session.
 - [x] `wtg space list`
 - [x] `wtg space add`
 - [x] `wtg space delete`
+- [x] `wtg space path`
 - [x] `wtg status`
 
 ## Phase 3 — Polish

@@ -144,7 +144,11 @@ func RunSpaceList(out io.Writer) error {
 	sort.Slice(spaces, func(i, j int) bool { return spaces[i].Name < spaces[j].Name })
 	tbl := ui.NewTableWriter(out)
 	for _, sp := range spaces {
-		tbl.Row(sp.Name, sp.Branch, sp.Path, fmt.Sprintf("%d repos", len(sp.Repos)))
+		names := make([]string, len(sp.Repos))
+		for i, r := range sp.Repos {
+			names[i] = r.Name
+		}
+		tbl.Row(sp.Name, sp.Branch, sp.Path, fmt.Sprintf("%d repos", len(sp.Repos)), strings.Join(names, ", "))
 	}
 	tbl.Flush()
 	return nil
