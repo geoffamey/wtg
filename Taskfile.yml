@@ -7,16 +7,16 @@ tasks:
 
   test:
     desc: Run all tests
-    cmd: go test ./...
+    cmd: go tool gotestsum -- ./...
 
   test:race:
     desc: Run all tests with the race detector
-    cmd: go test -race ./...
+    cmd: go tool gotestsum -- -race ./...
 
   test:coverage:
     desc: Run all tests with coverage report
     cmds:
-      - go test -coverprofile=coverage.out ./...
+      - go tool gotestsum -- -coverprofile=coverage.out ./...
       - go tool cover -func=coverage.out
 
   fmt:
