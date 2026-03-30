@@ -157,6 +157,22 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
+				Name:          "status",
+				Aliases:       []string{"st"},
+				Usage:         "show status of workspaces (alias for wtg status)",
+				ArgsUsage:     "[<space>]",
+				ShellComplete: completeSpaces,
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "detailed",
+						Usage: "show individual modified files per repo",
+					},
+				},
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					return RunStatus(runner, cmd.Args().Slice(), cmd.Bool("detailed"), os.Stdout)
+				},
+			},
+			{
 				Name:          "add",
 				Usage:         "add repos to an existing workspace",
 				ArgsUsage:     "<name> <repo>...",
