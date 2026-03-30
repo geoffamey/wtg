@@ -31,28 +31,23 @@ func RepoCommand(runner git.Runner) *cli.Command {
 		Usage: "manage repositories",
 		Commands: []*cli.Command{
 			{
-				Name:          "discover",
-				Aliases:       []string{"list"},
-				Usage:         "scan discovery.root_dir for git repositories",
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					cfg, err := config.Load(cmd.String("config"))
-					if err != nil {
-						return err
-					}
-					return RunDiscover(cfg, runner, os.Stdout)
-				},
-			},
-			{
 				Name:          "status",
 				Usage:         "show status of main repo clones",
 				ArgsUsage:     "[<repo>...]",
 				ShellComplete: completeRepos,
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "long",
+						Aliases: []string{"l"},
+						Usage:   "also show remote URL and local path",
+					},
+				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					cfg, err := config.Load(cmd.String("config"))
 					if err != nil {
 						return err
 					}
-					return RunRepoStatus(cfg, runner, cmd.Args().Slice(), os.Stdout)
+					return RunRepoStatus(cfg, runner, cmd.Args().Slice(), cmd.Bool("long"), os.Stdout)
 				},
 			},
 			{
@@ -83,30 +78,6 @@ func RepoCommand(runner git.Runner) *cli.Command {
 			},
 		},
 	}
-}
-
-// RunDiscover scans cfg.Discovery.RootDir for git repositories and prints them
-// as an aligned table of name, remote URL, and absolute path.
-func RunDiscover(cfg *config.Config, runner git.Runner, out io.Writer) error {
-	if cfg.Discovery.RootDir == "" {
-		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
-	}
-
-	paths, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
-	if err != nil {
-		return fmt.Errorf("scan %s: %w", cfg.Discovery.RootDir, err)
-	}
-
-	sort.Strings(paths)
-
-	tbl := ui.NewTableWriter(out)
-	for _, p := range paths {
-		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
-		remote, _ := runner.RemoteURL(p, "origin") // empty if no remote configured
-		tbl.Row(name, remote, p)
-	}
-	tbl.Flush()
-	return nil
 }
 
 // discoverRepoPaths recursively scans root up to maxDepth levels deep and
@@ -300,8 +271,9 @@ func resolveRepoPaths(cfg *config.Config, args []string) ([]string, error) {
 
 // RunRepoStatus prints a status table for all discovered repos (or the named
 // subset). Each row shows the repo name, current branch, working-tree state,
-// and ahead/behind counts relative to origin.
-func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.Writer) error {
+// and ahead/behind counts relative to origin. When long is true, the remote
+// URL and absolute path are appended in a muted style.
+func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, long bool, out io.Writer) error {
 	if cfg.Discovery.RootDir == "" {
 		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
 	}
@@ -321,7 +293,7 @@ func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.
 	for i, p := range paths {
 		g.Go(func() error {
 			name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
-			results[i] = statusResult{name, repoStatusCols(p, runner)}
+			results[i] = statusResult{name, repoStatusCols(p, runner, long)}
 			return nil
 		})
 	}
@@ -335,8 +307,10 @@ func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, out io.
 	return nil
 }
 
-// repoStatusCols returns the branch, status, and ahead/behind columns for one repo.
-func repoStatusCols(repoPath string, runner git.Runner) []string {
+// repoStatusCols returns the branch, status, and ahead/behind columns for one
+// repo. When long is true, two additional muted columns are appended: the
+// remote URL (origin) and the absolute local path.
+func repoStatusCols(repoPath string, runner git.Runner, long bool) []string {
 	st, err := runner.Status(repoPath)
 	if err != nil {
 		return []string{ui.Fail.Render(ui.SymFail + " " + err.Error())}
@@ -344,11 +318,18 @@ func repoStatusCols(repoPath string, runner git.Runner) []string {
 
 	defaultBranch, _ := runner.DefaultBranch(repoPath) // empty if no remote
 
-	return []string{
+	cols := []string{
 		branchCol(st.Branch, defaultBranch),
 		statusCol(st.Files),
 		aheadBehindCol(st.Ahead, st.Behind, st.Upstream != ""),
 	}
+
+	if long {
+		remote, _ := runner.RemoteURL(repoPath, "origin")
+		cols = append(cols, ui.Muted.Render(remote), ui.Muted.Render(repoPath))
+	}
+
+	return cols
 }
 
 // branchCol renders the branch name, highlighted if it differs from the default.

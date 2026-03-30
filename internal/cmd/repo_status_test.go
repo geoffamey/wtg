@@ -137,7 +137,7 @@ func TestRunRepoStatus_Output(t *testing.T) {
 	r := statusRunner(git.RepoStatus{Branch: "main", Upstream: "origin/main"}, "main")
 
 	var out bytes.Buffer
-	if err := RunRepoStatus(discoverCfg(root, 2), r, nil, &out); err != nil {
+	if err := RunRepoStatus(discoverCfg(root, 2), r, nil, false, &out); err != nil {
 		t.Fatalf("RunRepoStatus: %v", err)
 	}
 	got := out.String()
@@ -157,7 +157,7 @@ func TestRunRepoStatus_NamedRepo(t *testing.T) {
 	r := statusRunner(git.RepoStatus{Branch: "main"}, "main")
 
 	var out bytes.Buffer
-	if err := RunRepoStatus(discoverCfg(root, 2), r, []string{"api"}, &out); err != nil {
+	if err := RunRepoStatus(discoverCfg(root, 2), r, []string{"api"}, false, &out); err != nil {
 		t.Fatalf("RunRepoStatus: %v", err)
 	}
 	got := out.String()
@@ -168,7 +168,32 @@ func TestRunRepoStatus_NamedRepo(t *testing.T) {
 
 func TestRunRepoStatus_NoRootDir(t *testing.T) {
 	var out bytes.Buffer
-	if err := RunRepoStatus(discoverCfg("", 2), &testRunner{}, nil, &out); err == nil {
+	if err := RunRepoStatus(discoverCfg("", 2), &testRunner{}, nil, false, &out); err == nil {
 		t.Fatal("expected error for empty root_dir")
+	}
+}
+
+func TestRunRepoStatus_Long(t *testing.T) {
+	root := t.TempDir()
+	apiPath := makeRepo(t, root, "api")
+
+	r := &testRunner{
+		statusFn:        func(string) (git.RepoStatus, error) { return git.RepoStatus{Branch: "main", Upstream: "origin/main"}, nil },
+		defaultBranchFn: func(string) (string, error) { return "main", nil },
+		remoteURLFn: func(repoPath, remote string) (string, error) {
+			return "https://github.com/org/api.git", nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunRepoStatus(discoverCfg(root, 2), r, nil, true, &out); err != nil {
+		t.Fatalf("RunRepoStatus: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "https://github.com/org/api.git") {
+		t.Errorf("long output missing remote URL: %q", got)
+	}
+	if !strings.Contains(got, apiPath) {
+		t.Errorf("long output missing local path: %q", got)
 	}
 }

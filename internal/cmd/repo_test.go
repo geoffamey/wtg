@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,90 +113,3 @@ func TestDiscoverRepoPaths_Empty(t *testing.T) {
 	}
 }
 
-// --- RunDiscover ---
-
-func TestRunDiscover_Output(t *testing.T) {
-	root := t.TempDir()
-	apiPath := makeRepo(t, root, "api")
-	frontendPath := makeRepo(t, root, "myorg/frontend")
-
-	runner := &testRunner{
-		remoteURLFn: func(repoPath, remote string) (string, error) {
-			urls := map[string]string{
-				apiPath:      "https://github.com/org/api.git",
-				frontendPath: "https://github.com/org/frontend.git",
-			}
-			return urls[repoPath], nil
-		},
-	}
-
-	var out bytes.Buffer
-	err := RunDiscover(discoverCfg(root, 2), runner, &out)
-	if err != nil {
-		t.Fatalf("RunDiscover: %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "api") {
-		t.Errorf("output missing 'api': %q", got)
-	}
-	if !strings.Contains(got, "myorg/frontend") {
-		t.Errorf("output missing 'myorg/frontend': %q", got)
-	}
-	if !strings.Contains(got, "https://github.com/org/api.git") {
-		t.Errorf("output missing remote URL: %q", got)
-	}
-}
-
-func TestRunDiscover_NoRootDir(t *testing.T) {
-	err := RunDiscover(&config.Config{}, &testRunner{}, &bytes.Buffer{})
-	if err == nil {
-		t.Fatal("expected error when root_dir is empty")
-	}
-}
-
-func TestRunDiscover_NoRemote(t *testing.T) {
-	root := t.TempDir()
-	makeRepo(t, root, "local-only")
-
-	runner := &testRunner{
-		remoteURLFn: func(repoPath, remote string) (string, error) {
-			return "", nil // no remote configured
-		},
-	}
-
-	var out bytes.Buffer
-	if err := RunDiscover(discoverCfg(root, 2), runner, &out); err != nil {
-		t.Fatalf("RunDiscover: %v", err)
-	}
-	if !strings.Contains(out.String(), "local-only") {
-		t.Errorf("expected local-only in output: %q", out.String())
-	}
-}
-
-func TestRunDiscover_SortedOutput(t *testing.T) {
-	root := t.TempDir()
-	makeRepo(t, root, "zzz")
-	makeRepo(t, root, "aaa")
-	makeRepo(t, root, "mmm")
-
-	runner := &testRunner{
-		remoteURLFn: func(string, string) (string, error) { return "", nil },
-	}
-
-	var out bytes.Buffer
-	if err := RunDiscover(discoverCfg(root, 2), runner, &out); err != nil {
-		t.Fatalf("RunDiscover: %v", err)
-	}
-
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 3 {
-		t.Fatalf("expected 3 lines, got %d", len(lines))
-	}
-	if !strings.HasPrefix(strings.TrimSpace(lines[0]), "aaa") {
-		t.Errorf("first line should be aaa, got %q", lines[0])
-	}
-	if !strings.HasPrefix(strings.TrimSpace(lines[2]), "zzz") {
-		t.Errorf("last line should be zzz, got %q", lines[2])
-	}
-}

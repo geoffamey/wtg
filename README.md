@@ -70,22 +70,13 @@ Override any key with `--config <path>`, `WTG_CONFIG=<path>`, or env vars like `
 
 ## Commands
 
-### `wtg repo discover`
-
-Scan for git repos and print their names, remote URLs, and paths. `wtg repo list` is an alias.
-
-```
-api     https://github.com/myorg/api.git      /Users/geoff/repos/api
-infra   https://github.com/myorg/infra.git    /Users/geoff/repos/infra
-```
-
 ### `wtg repo sync [<repo>...]`
 
 Fetch and fast-forward each repo's default branch. Skips repos that are dirty or not on the default branch. Syncs all discovered repos if none are specified.
 
-### `wtg repo status [<repo>...]`
+### `wtg repo status [<repo>...] [--long]`
 
-Show branch, working-tree state, and ahead/behind counts for each repo's main clone.
+Show branch, working-tree state, and ahead/behind counts for each repo's main clone. Pass `--long` (`-l`) to also show the remote URL and local path.
 
 ### `wtg space create <name> [<repo>...] [--branch <branch>] [--path <dir>]`
 

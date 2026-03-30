@@ -224,7 +224,7 @@ func TestRunRepoStatus_Parallel(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- RunRepoStatus(discoverCfg(root, 1), r, nil, io.Discard)
+			done <- RunRepoStatus(discoverCfg(root, 1), r, nil, false, io.Discard)
 		}()
 
 		synctest.Wait()
