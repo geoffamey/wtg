@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"runtime/debug"
 
 	"github.com/urfave/cli/v3"
 
@@ -28,6 +30,23 @@ func main() {
 			cmd.RepoCommand(git.New()),
 			cmd.SpaceCommand(git.New()),
 			cmd.StatusCommand(git.New()),
+			{
+				Name:  "version",
+				Usage: "print version information",
+				Action: func(_ context.Context, _ *cli.Command) error {
+					info, ok := debug.ReadBuildInfo()
+					if !ok {
+						fmt.Println("(unknown)")
+						return nil
+					}
+					v := info.Main.Version
+					if v == "" || v == "(devel)" {
+						v = "(devel)"
+					}
+					fmt.Println(v)
+					return nil
+				},
+			},
 		},
 	}
 
