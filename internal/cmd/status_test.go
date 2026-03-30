@@ -173,7 +173,7 @@ func TestRunStatus_MultipleSpaces_SortedAndSeparated(t *testing.T) {
 
 // --- summary vs detail ---
 
-func TestRunStatus_NoArg_OutsideSpace_ShowsSummary(t *testing.T) {
+func TestRunStatus_NoArg_OutsideSpace_ShowsAllSpaces(t *testing.T) {
 	isolateState(t)
 	// Use a path that does not contain the test's CWD.
 	makeSpace(t, "feat", "geoff/feat", "/nonexistent/path/feat", []string{"api"}, "/repos")
@@ -183,14 +183,13 @@ func TestRunStatus_NoArg_OutsideSpace_ShowsSummary(t *testing.T) {
 	if err := RunStatus(r, nil, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
-	// Summary should show the space name but no per-repo branch column.
 	got := out.String()
 	if !strings.Contains(got, "feat") {
-		t.Errorf("summary missing space name: %q", got)
+		t.Errorf("missing space name: %q", got)
 	}
-	// Summary does not run git, so no branch column rendered by worktreeStatusCols.
-	if strings.Contains(got, "[geoff/feat]") {
-		t.Errorf("summary should not show per-repo branch column: %q", got)
+	// Full detail is shown, so the per-repo branch column is present.
+	if !strings.Contains(got, ui.Muted.Render("[geoff/feat]")) {
+		t.Errorf("should show per-repo branch column: %q", got)
 	}
 }
 

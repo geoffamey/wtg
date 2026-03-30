@@ -53,7 +53,15 @@ func RunStatus(runner git.Runner, names []string, detailed bool, out io.Writer) 
 		if sp := spaceContainingCWD(spaces); sp != nil {
 			return printSpaceDetail(runner, sp, detailed, out)
 		}
-		return printSummary(spaces, out)
+		for i, sp := range spaces {
+			if i > 0 {
+				fmt.Fprintln(out)
+			}
+			if err := printSpaceDetail(runner, sp, detailed, out); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	for i, name := range names {
@@ -87,17 +95,6 @@ func spaceContainingCWD(spaces []*state.Space) *state.Space {
 	return nil
 }
 
-// printSummary prints a one-line metadata row for each space without running
-// any git commands.
-func printSummary(spaces []*state.Space, out io.Writer) error {
-	tbl := ui.NewTableWriter(out)
-	for _, sp := range spaces {
-		tbl.Row(sp.Name, sp.Branch, sp.Path, fmt.Sprintf("%d repos", len(sp.Repos)))
-	}
-	tbl.Flush()
-	return nil
-}
-
 // repoStatusResult holds the git status (or error) for one worktree.
 type repoStatusResult struct {
 	entry state.RepoEntry
@@ -108,11 +105,9 @@ type repoStatusResult struct {
 // printSpaceDetail prints the space header followed by a per-repo status table.
 // When detailed is true it appends modified-file listings under each dirty repo.
 func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.Writer) error {
-	fmt.Fprintf(out, "%s  %s  %s  %d repos\n",
+	fmt.Fprintf(out, "%s  %s\n",
 		ui.Bold.Render(sp.Name),
-		ui.Muted.Render(sp.Branch),
 		ui.Muted.Render(sp.Path),
-		len(sp.Repos),
 	)
 
 	results := make([]repoStatusResult, len(sp.Repos))
