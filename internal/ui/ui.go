@@ -3,6 +3,7 @@ package ui
 
 import (
 	"io"
+	"strings"
 	"text/tabwriter"
 
 	"charm.land/lipgloss/v2"
@@ -18,12 +19,20 @@ const (
 
 // Styles.
 var (
-	OK    = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
-	Warn  = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
-	Fail  = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
-	Muted = lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // bright black / grey
-	Bold  = lipgloss.NewStyle().Bold(true)
+	OK     = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
+	Warn   = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
+	Fail   = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
+	Muted  = lipgloss.NewStyle().Foreground(lipgloss.Color("8")) // bright black / grey
+	Bold   = lipgloss.NewStyle().Bold(true)
+	Header = Muted.Bold(true)
 )
+
+// SectionHeader renders a bold+muted label followed by a muted trailing rule,
+// e.g. "REPOS ────────────────────────────".
+func SectionHeader(label string) string {
+	const ruleLen = 30
+	return Header.Render(label) + " " + Muted.Render(strings.Repeat("─", ruleLen))
+}
 
 // Table is a tab-aligned columnar writer. Call Row for each line, then Flush.
 // Columns are separated by \t; tabwriter handles alignment.

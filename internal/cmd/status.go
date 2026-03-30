@@ -13,6 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/state"
 	"github.com/geoffamey/wtg/internal/ui"
@@ -22,7 +23,7 @@ import (
 func StatusCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "status",
-		Usage:         "show status of all workspace worktrees",
+		Usage:         "show status of repos and workspaces",
 		ArgsUsage:     "[<space>]",
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
@@ -32,17 +33,32 @@ func StatusCommand(runner git.Runner) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return RunStatus(runner, cmd.Args().Slice(), cmd.Bool("detailed"), os.Stdout)
+			names := cmd.Args().Slice()
+			detailed := cmd.Bool("detailed")
+			if len(names) > 0 {
+				return RunSpaceStatus(runner, names, detailed, os.Stdout)
+			}
+			cfg, err := config.Load(cmd.Root().String("config"))
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stdout, "%s\n", ui.SectionHeader("REPOS"))
+			if err := RunRepoStatus(cfg, runner, nil, false, os.Stdout); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stdout)
+			fmt.Fprintf(os.Stdout, "%s\n", ui.SectionHeader("SPACES"))
+			return RunSpaceStatus(runner, nil, detailed, os.Stdout)
 		},
 	}
 }
 
-// RunStatus shows workspace status. With no arguments it detects whether the
-// current directory is inside a known space and shows that space in detail; if
-// not, it prints a one-line summary for every space. With a named space it
-// always shows full per-repo detail. The --detailed flag adds individual
+// RunSpaceStatus shows workspace status. With no arguments it detects whether
+// the current directory is inside a known space and shows that space in detail;
+// if not, it prints per-repo detail for every space. With named spaces it shows
+// full per-repo detail for each. The --detailed flag adds individual
 // modified-file listings under each repo row.
-func RunStatus(runner git.Runner, names []string, detailed bool, out io.Writer) error {
+func RunSpaceStatus(runner git.Runner, names []string, detailed bool, out io.Writer) error {
 	if len(names) == 0 {
 		spaces, err := state.List()
 		if err != nil {

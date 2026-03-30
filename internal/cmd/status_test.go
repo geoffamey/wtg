@@ -20,7 +20,7 @@ func alwaysStatus(st git.RepoStatus) func(string) (git.RepoStatus, error) {
 func TestRunStatus_NoSpaces(t *testing.T) {
 	isolateState(t)
 	var out bytes.Buffer
-	if err := RunStatus(&testRunner{}, nil, false, &out); err != nil {
+	if err := RunSpaceStatus(&testRunner{}, nil, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	if out.String() != "" {
@@ -37,7 +37,7 @@ func TestRunStatus_ShowsSpaceHeader(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat", Upstream: "origin/geoff/feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, false, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	got := out.String()
@@ -59,7 +59,7 @@ func TestRunStatus_OnSpaceBranch_ShowsMuted(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, false, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	want := ui.Muted.Render("[geoff/feat]")
@@ -75,7 +75,7 @@ func TestRunStatus_WrongBranch_ShowsWarn(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "other-branch"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, false, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	want := ui.Warn.Render("[other-branch]")
@@ -95,7 +95,7 @@ func TestRunStatus_DirtyWorktree(t *testing.T) {
 	}
 	r := &testRunner{statusFn: alwaysStatus(dirty)}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, false, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	if !strings.Contains(out.String(), "modified") {
@@ -112,7 +112,7 @@ func TestRunStatus_StatusError_ShowsFailRow(t *testing.T) {
 		return git.RepoStatus{}, fmt.Errorf("worktree missing")
 	}}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, false, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	if !strings.Contains(out.String(), "worktree missing") {
@@ -129,7 +129,7 @@ func TestRunStatus_NamedSpaces(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, false, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	got := out.String()
@@ -144,7 +144,7 @@ func TestRunStatus_NamedSpaces(t *testing.T) {
 func TestRunStatus_UnknownSpace_Error(t *testing.T) {
 	isolateState(t)
 	var out bytes.Buffer
-	err := RunStatus(&testRunner{}, []string{"nonexistent"}, false, &out)
+	err := RunSpaceStatus(&testRunner{}, []string{"nonexistent"}, false, &out)
 	if err == nil {
 		t.Fatal("expected error for unknown space")
 	}
@@ -162,7 +162,7 @@ func TestRunStatus_MultipleSpaces_SortedAndSeparated(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, nil, false, &out); err != nil {
+	if err := RunSpaceStatus(r, nil, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	got := out.String()
@@ -180,7 +180,7 @@ func TestRunStatus_NoArg_OutsideSpace_ShowsAllSpaces(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, nil, false, &out); err != nil {
+	if err := RunSpaceStatus(r, nil, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	got := out.String()
@@ -201,7 +201,7 @@ func TestRunStatus_NoArg_InsideSpace_ShowsDetail(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, nil, false, &out); err != nil {
+	if err := RunSpaceStatus(r, nil, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	// Detail view runs git and shows per-repo branch column.
@@ -227,7 +227,7 @@ func TestRunStatus_Detailed_ShowsFiles(t *testing.T) {
 	}
 	r := &testRunner{statusFn: alwaysStatus(dirty)}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, true, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, true, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	got := out.String()
@@ -246,7 +246,7 @@ func TestRunStatus_Detailed_CleanRepo_NoFileLines(t *testing.T) {
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
-	if err := RunStatus(r, []string{"feat"}, true, &out); err != nil {
+	if err := RunSpaceStatus(r, []string{"feat"}, true, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
 	// Clean repo should produce no file lines (no extra indented content).

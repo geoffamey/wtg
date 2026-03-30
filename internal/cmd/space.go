@@ -169,7 +169,7 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return RunStatus(runner, cmd.Args().Slice(), cmd.Bool("detailed"), os.Stdout)
+					return RunSpaceStatus(runner, cmd.Args().Slice(), cmd.Bool("detailed"), os.Stdout)
 				},
 			},
 			{
