@@ -3,6 +3,8 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -359,6 +361,39 @@ func TestRunSpaceDelete_EmptySpace_DeletesState(t *testing.T) {
 	}
 	if _, err := state.Load("feat"); err == nil {
 		t.Error("state should be deleted for empty space")
+	}
+}
+
+// --- go.work / go.work.sum cleanup ---
+
+func TestRunSpaceDelete_RemovesGoWorkAndSum(t *testing.T) {
+	isolateState(t)
+	spacePath := t.TempDir()
+	sp := makeSpace(t, "feat", "feat", spacePath, nil, "")
+	sp.GoWorkspace = true
+	if err := state.Save(sp); err != nil {
+		t.Fatalf("state.Save: %v", err)
+	}
+
+	// Write both files so os.Remove has something to delete.
+	goWork := filepath.Join(spacePath, "go.work")
+	goWorkSum := filepath.Join(spacePath, "go.work.sum")
+	if err := os.WriteFile(goWork, []byte("go 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.work: %v", err)
+	}
+	if err := os.WriteFile(goWorkSum, []byte(""), 0o644); err != nil {
+		t.Fatalf("write go.work.sum: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(&testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+	if _, err := os.Stat(goWork); err == nil {
+		t.Error("go.work should be removed on space delete")
+	}
+	if _, err := os.Stat(goWorkSum); err == nil {
+		t.Error("go.work.sum should be removed on space delete")
 	}
 }
 

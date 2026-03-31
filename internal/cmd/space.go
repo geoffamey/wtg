@@ -624,6 +624,10 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 		if err := os.Remove(goWorkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			fmt.Fprintf(out, "  %s could not remove go.work: %v\n", ui.SymWarn, err)
 		}
+		goWorkSumPath := filepath.Join(sp.Path, "go.work.sum")
+		if err := os.Remove(goWorkSumPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(out, "  %s could not remove go.work.sum: %v\n", ui.SymWarn, err)
+		}
 	}
 
 	// Remove the space root directory. Only succeeds when empty; if the user
