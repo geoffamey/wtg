@@ -121,10 +121,11 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
-				Name:          "exec",
-				Usage:         "run a command in each worktree of a space",
-				ArgsUsage:     "<name> <cmd> [<args>...]",
-				ShellComplete: completeSpaces,
+				Name:            "exec",
+				Usage:           "run a command in each worktree of a space",
+				ArgsUsage:       "<name> <cmd> [<args>...]",
+				ShellComplete:   completeSpaces,
+				SkipFlagParsing: true,
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					if cmd.Args().Len() < 2 {
 						return fmt.Errorf("usage: wtg space exec <name> <cmd> [<args>...]")
