@@ -44,7 +44,7 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				Name:          "create",
 				Usage:         "create a new workspace",
 				ArgsUsage:     "<name> [<repo>...]",
-				ShellComplete: completeRepos,
+				ShellComplete: completeReposAfterFirst,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "branch",
@@ -177,7 +177,7 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				Name:          "add",
 				Usage:         "add repos to an existing workspace",
 				ArgsUsage:     "<name> <repo>...",
-				ShellComplete: completeRepos,
+				ShellComplete: completeSpaceThenRepos,
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					if cmd.Args().Len() < 2 {
 						return fmt.Errorf("usage: wtg space add <name> <repo>")
@@ -196,7 +196,7 @@ func SpaceCommand(runner git.Runner) *cli.Command {
 				Name:          "remove",
 				Usage:         "remove repos from an existing workspace",
 				ArgsUsage:     "<name> <repo>...",
-				ShellComplete: completeSpaces,
+				ShellComplete: completeSpaceMembers,
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Name:  "d",
