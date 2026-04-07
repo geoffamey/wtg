@@ -37,29 +37,29 @@ func createRunner() *testRunner {
 
 // --- validation errors ---
 
-func TestRunSpaceCreate_NoSpacesRoot(t *testing.T) {
+func TestRunSpaceNew_NoSpacesRoot(t *testing.T) {
 	isolateState(t)
 	cfg := &config.Config{
 		Discovery: config.DiscoveryConfig{RootDir: t.TempDir(), MaxDepth: 2},
 	}
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, &testRunner{}, SpaceCreateArgs{Name: "feat"}, &out); err == nil {
+	if err := RunSpaceNew(cfg, &testRunner{}, SpaceNewArgs{Name: "feat"}, &out); err == nil {
 		t.Fatal("expected error when spaces.root_dir is empty and no --path")
 	}
 }
 
-func TestRunSpaceCreate_NoDiscoveryRoot(t *testing.T) {
+func TestRunSpaceNew_NoDiscoveryRoot(t *testing.T) {
 	isolateState(t)
 	cfg := &config.Config{
 		Spaces: config.SpacesConfig{RootDir: t.TempDir()},
 	}
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, &testRunner{}, SpaceCreateArgs{Name: "feat"}, &out); err == nil {
+	if err := RunSpaceNew(cfg, &testRunner{}, SpaceNewArgs{Name: "feat"}, &out); err == nil {
 		t.Fatal("expected error when discovery.root_dir is empty")
 	}
 }
 
-func TestRunSpaceCreate_PathFlagBypassesSpacesRoot(t *testing.T) {
+func TestRunSpaceNew_PathFlagBypassesSpacesRoot(t *testing.T) {
 	root := t.TempDir()
 	spacePath := t.TempDir()
 	isolateState(t)
@@ -69,7 +69,7 @@ func TestRunSpaceCreate_PathFlagBypassesSpacesRoot(t *testing.T) {
 		Discovery: config.DiscoveryConfig{RootDir: root, MaxDepth: 2},
 	}
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{
+	if err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{
 		Name: "feat",
 		Path: spacePath,
 	}, &out); err != nil {
@@ -77,23 +77,23 @@ func TestRunSpaceCreate_PathFlagBypassesSpacesRoot(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_NoRepos(t *testing.T) {
+func TestRunSpaceNew_NoRepos(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	cfg := spaceCreateCfg(root, t.TempDir())
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, &testRunner{}, SpaceCreateArgs{Name: "feat"}, &out); err == nil {
+	if err := RunSpaceNew(cfg, &testRunner{}, SpaceNewArgs{Name: "feat"}, &out); err == nil {
 		t.Fatal("expected error when no repos found")
 	}
 }
 
-func TestRunSpaceCreate_UnknownRepo(t *testing.T) {
+func TestRunSpaceNew_UnknownRepo(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
 	cfg := spaceCreateCfg(root, t.TempDir())
 	var out bytes.Buffer
-	err := RunSpaceCreate(cfg, &testRunner{}, SpaceCreateArgs{
+	err := RunSpaceNew(cfg, &testRunner{}, SpaceNewArgs{
 		Name:  "feat",
 		Repos: []string{"nonexistent"},
 	}, &out)
@@ -105,7 +105,7 @@ func TestRunSpaceCreate_UnknownRepo(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_SpaceAlreadyExists(t *testing.T) {
+func TestRunSpaceNew_SpaceAlreadyExists(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -114,7 +114,7 @@ func TestRunSpaceCreate_SpaceAlreadyExists(t *testing.T) {
 		t.Fatalf("state.Save: %v", err)
 	}
 	var out bytes.Buffer
-	err := RunSpaceCreate(cfg, &testRunner{}, SpaceCreateArgs{Name: "feat"}, &out)
+	err := RunSpaceNew(cfg, &testRunner{}, SpaceNewArgs{Name: "feat"}, &out)
 	if err == nil {
 		t.Fatal("expected error when space already exists")
 	}
@@ -125,7 +125,7 @@ func TestRunSpaceCreate_SpaceAlreadyExists(t *testing.T) {
 
 // --- branch conflict ---
 
-func TestRunSpaceCreate_BranchConflict(t *testing.T) {
+func TestRunSpaceNew_BranchConflict(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -139,7 +139,7 @@ func TestRunSpaceCreate_BranchConflict(t *testing.T) {
 		},
 	}
 	var out bytes.Buffer
-	err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat", Branch: "feat"}, &out)
+	err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Branch: "feat"}, &out)
 	if err == nil {
 		t.Fatal("expected error for branch already checked out")
 	}
@@ -148,7 +148,7 @@ func TestRunSpaceCreate_BranchConflict(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_ExistingBranchNotCheckedOut(t *testing.T) {
+func TestRunSpaceNew_ExistingBranchNotCheckedOut(t *testing.T) {
 	// Branch exists but is not checked out anywhere — should succeed and use existing branch.
 	root := t.TempDir()
 	isolateState(t)
@@ -170,8 +170,8 @@ func TestRunSpaceCreate_ExistingBranchNotCheckedOut(t *testing.T) {
 		},
 	}
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat", Branch: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Branch: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if createBranch {
 		t.Error("should not create branch when it already exists")
@@ -180,7 +180,7 @@ func TestRunSpaceCreate_ExistingBranchNotCheckedOut(t *testing.T) {
 
 // --- happy path ---
 
-func TestRunSpaceCreate_Success(t *testing.T) {
+func TestRunSpaceNew_Success(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -198,8 +198,8 @@ func TestRunSpaceCreate_Success(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if len(added) != 2 {
 		t.Errorf("expected 2 worktree adds, got %d", len(added))
@@ -221,7 +221,7 @@ func TestRunSpaceCreate_Success(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_DefaultBranch(t *testing.T) {
+func TestRunSpaceNew_DefaultBranch(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -238,15 +238,15 @@ func TestRunSpaceCreate_DefaultBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if usedBranch != "geoff/feat" {
 		t.Errorf("branch: got %q, want %q", usedBranch, "geoff/feat")
 	}
 }
 
-func TestRunSpaceCreate_BaseFlag(t *testing.T) {
+func TestRunSpaceNew_BaseFlag(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -262,15 +262,15 @@ func TestRunSpaceCreate_BaseFlag(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat", Base: "origin/main"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Base: "origin/main"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if gotBase != "origin/main" {
 		t.Errorf("base: got %q, want %q", gotBase, "origin/main")
 	}
 }
 
-func TestRunSpaceCreate_NoBase_PassesEmpty(t *testing.T) {
+func TestRunSpaceNew_NoBase_PassesEmpty(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -286,15 +286,15 @@ func TestRunSpaceCreate_NoBase_PassesEmpty(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if gotBase != "" {
 		t.Errorf("base should be empty when not set, got %q", gotBase)
 	}
 }
 
-func TestRunSpaceCreate_NamedRepos(t *testing.T) {
+func TestRunSpaceNew_NamedRepos(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -311,11 +311,11 @@ func TestRunSpaceCreate_NamedRepos(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{
 		Name:  "feat",
 		Repos: []string{"api"},
 	}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if len(added) != 1 {
 		t.Errorf("expected 1 worktree add (api only), got %d", len(added))
@@ -324,7 +324,7 @@ func TestRunSpaceCreate_NamedRepos(t *testing.T) {
 
 // --- saga rollback ---
 
-func TestRunSpaceCreate_RollbackOnFailure(t *testing.T) {
+func TestRunSpaceNew_RollbackOnFailure(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -350,7 +350,7 @@ func TestRunSpaceCreate_RollbackOnFailure(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out)
+	err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat"}, &out)
 	if err == nil {
 		t.Fatal("expected error on second worktree add failure")
 	}
@@ -367,7 +367,7 @@ func TestRunSpaceCreate_RollbackOnFailure(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_RollbackDeletesCreatedBranch(t *testing.T) {
+func TestRunSpaceNew_RollbackDeletesCreatedBranch(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -393,14 +393,14 @@ func TestRunSpaceCreate_RollbackDeletesCreatedBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	_ = RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out)
+	_ = RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat"}, &out)
 
 	if len(deletedBranches) != 1 || deletedBranches[0] != "feat" {
 		t.Errorf("expected created branch to be deleted on rollback, got %v", deletedBranches)
 	}
 }
 
-func TestRunSpaceCreate_RollbackPreservesExistingBranch(t *testing.T) {
+func TestRunSpaceNew_RollbackPreservesExistingBranch(t *testing.T) {
 	root := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
@@ -430,7 +430,7 @@ func TestRunSpaceCreate_RollbackPreservesExistingBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	_ = RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat", Branch: "feat"}, &out)
+	_ = RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Branch: "feat"}, &out)
 
 	if branchDeleted {
 		t.Error("pre-existing branch should not be deleted on rollback")
@@ -439,7 +439,7 @@ func TestRunSpaceCreate_RollbackPreservesExistingBranch(t *testing.T) {
 
 // --- nested repos ---
 
-func TestRunSpaceCreate_NestedRepoLayout(t *testing.T) {
+func TestRunSpaceNew_NestedRepoLayout(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -457,8 +457,8 @@ func TestRunSpaceCreate_NestedRepoLayout(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, r, SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 
 	spaceRoot := filepath.Join(spacesRoot, "feat")
@@ -490,7 +490,7 @@ func TestRunSpaceCreate_NestedRepoLayout(t *testing.T) {
 
 // --- go.work ---
 
-func TestRunSpaceCreate_GoWork(t *testing.T) {
+func TestRunSpaceNew_GoWork(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -503,8 +503,8 @@ func TestRunSpaceCreate_GoWork(t *testing.T) {
 
 	cfg := spaceCreateCfg(root, spacesRoot)
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(spacesRoot, "feat", "go.work"))
@@ -524,7 +524,7 @@ func TestRunSpaceCreate_GoWork(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_GoWork_MaxVersion(t *testing.T) {
+func TestRunSpaceNew_GoWork_MaxVersion(t *testing.T) {
 	// When multiple modules declare different go versions, the highest wins.
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
@@ -539,8 +539,8 @@ func TestRunSpaceCreate_GoWork_MaxVersion(t *testing.T) {
 
 	cfg := spaceCreateCfg(root, spacesRoot)
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(spacesRoot, "feat", "go.work"))
@@ -577,7 +577,7 @@ func TestCmpGoVersion(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_GoWorkRemovedOnRollback(t *testing.T) {
+func TestRunSpaceNew_GoWorkRemovedOnRollback(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	apiPath := makeRepo(t, root, "api")
@@ -597,7 +597,7 @@ func TestRunSpaceCreate_GoWorkRemovedOnRollback(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", blockFile)
 
 	var out bytes.Buffer
-	err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{Name: "feat"}, &out)
+	err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat"}, &out)
 	if err == nil {
 		t.Fatal("expected error when state save fails")
 	}
@@ -609,7 +609,7 @@ func TestRunSpaceCreate_GoWorkRemovedOnRollback(t *testing.T) {
 	}
 }
 
-func TestRunSpaceCreate_NoGoWork_WhenNoGoMods(t *testing.T) {
+func TestRunSpaceNew_NoGoWork_WhenNoGoMods(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -617,8 +617,8 @@ func TestRunSpaceCreate_NoGoWork_WhenNoGoMods(t *testing.T) {
 	cfg := spaceCreateCfg(root, spacesRoot)
 
 	var out bytes.Buffer
-	if err := RunSpaceCreate(cfg, createRunner(), SpaceCreateArgs{Name: "feat"}, &out); err != nil {
-		t.Fatalf("RunSpaceCreate: %v", err)
+	if err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(spacesRoot, "feat", "go.work")); err == nil {
 		t.Error("go.work should not be created when no repos have go.mod")

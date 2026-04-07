@@ -29,7 +29,7 @@ func main() {
 			cmd.InitCommand(),
 			cmd.RepoCommand(git.New()),
 			cmd.StatusCommand(git.New()),
-			cmd.CreateCommand(git.New()),
+			cmd.NewCommand(git.New()),
 			cmd.DeleteCommand(git.New()),
 			cmd.AddCommand(git.New()),
 			cmd.RemoveCommand(git.New()),

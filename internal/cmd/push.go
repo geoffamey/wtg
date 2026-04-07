@@ -1,0 +1,69 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/urfave/cli/v3"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/geoffamey/wtg/internal/git"
+	"github.com/geoffamey/wtg/internal/state"
+	"github.com/geoffamey/wtg/internal/ui"
+)
+
+// PushCommand returns the `wtg push` command.
+func PushCommand(runner git.Runner) *cli.Command {
+	return &cli.Command{
+		Name:          "push",
+		Usage:         "push all branches in a workspace to origin",
+		ArgsUsage:     "<name>",
+		ShellComplete: completeSpaces,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() == 0 {
+				return fmt.Errorf("missing required argument: <name>")
+			}
+			return RunSpacePush(runner, cmd.Args().First(), os.Stdout)
+		},
+	}
+}
+
+// RunSpacePush pushes each repo's branch to origin in parallel.
+func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
+	sp, err := state.Load(spaceName)
+	if err != nil {
+		return fmt.Errorf("load space %q: %w", spaceName, err)
+	}
+
+	results := make([]opResult, len(sp.Repos))
+
+	var g errgroup.Group
+	for i, r := range sp.Repos {
+		g.Go(func() error {
+			if err := runner.Push(r.WorktreePath, sp.Branch); err != nil {
+				results[i] = opResult{r.Name, ui.SymFail, err.Error()}
+			} else {
+				results[i] = opResult{r.Name, ui.SymOK, "pushed " + sp.Branch}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
+
+	tbl := ui.NewTableWriter(out)
+	var failed []string
+	for _, r := range results {
+		tbl.Row(r.name, r.sym+" "+r.msg)
+		if r.sym == ui.SymFail {
+			failed = append(failed, r.name)
+		}
+	}
+	tbl.Flush()
+	if len(failed) > 0 {
+		return fmt.Errorf("push failed in: %s", strings.Join(failed, ", "))
+	}
+	return nil
+}
