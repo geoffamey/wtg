@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"runtime/debug"
@@ -17,6 +16,7 @@ func main() {
 	app := &cli.Command{
 		Name:                  "wtg",
 		Usage:                 "manage multi-repo feature workflows using git worktrees and Go workspaces",
+		Version:               buildVersion(),
 		EnableShellCompletion: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -28,29 +28,30 @@ func main() {
 		Commands: []*cli.Command{
 			cmd.InitCommand(),
 			cmd.RepoCommand(git.New()),
-			cmd.SpaceCommand(git.New()),
 			cmd.StatusCommand(git.New()),
-			{
-				Name:  "version",
-				Usage: "print version information",
-				Action: func(_ context.Context, _ *cli.Command) error {
-					info, ok := debug.ReadBuildInfo()
-					if !ok {
-						fmt.Println("(unknown)")
-						return nil
-					}
-					v := info.Main.Version
-					if v == "" || v == "(devel)" {
-						v = "(devel)"
-					}
-					fmt.Println(v)
-					return nil
-				},
-			},
+			cmd.CreateCommand(git.New()),
+			cmd.DeleteCommand(git.New()),
+			cmd.AddCommand(git.New()),
+			cmd.RemoveCommand(git.New()),
+			cmd.ExecCommand(),
+			cmd.PushCommand(git.New()),
+			cmd.PathCommand(),
 		},
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func buildVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "(unknown)"
+	}
+	v := info.Main.Version
+	if v == "" || v == "(devel)" {
+		return "(devel)"
+	}
+	return v
 }

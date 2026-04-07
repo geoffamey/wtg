@@ -42,6 +42,14 @@ func completeRepos(_ context.Context, cmd *cli.Command) {
 	}
 }
 
+// completeSpaceAtFirst completes a space name only at position 0.
+// Used for commands like exec where position 1+ is a pass-through command.
+func completeSpaceAtFirst(ctx context.Context, cmd *cli.Command) {
+	if cmd.NArg() <= 1 {
+		completeSpaces(ctx, cmd)
+	}
+}
+
 // completeReposAfterFirst completes discovered repos only at position 1+.
 // Used for commands where position 0 is a new name (e.g. space create).
 //

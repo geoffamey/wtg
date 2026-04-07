@@ -28,13 +28,14 @@ func StatusCommand(runner git.Runner) *cli.Command {
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:  "detailed",
-				Usage: "show individual modified files per repo",
+				Name:    "long",
+				Aliases: []string{"l"},
+				Usage:   "show individual modified files per repo",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			names := cmd.Args().Slice()
-			detailed := cmd.Bool("detailed")
+			detailed := cmd.Bool("long")
 			if len(names) > 0 {
 				return RunSpaceStatus(runner, names, detailed, os.Stdout)
 			}

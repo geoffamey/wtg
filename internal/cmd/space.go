@@ -26,229 +26,191 @@ import (
 	"github.com/geoffamey/wtg/internal/ui"
 )
 
-// SpaceCommand returns the `wtg space` command with its subcommands.
-func SpaceCommand(runner git.Runner) *cli.Command {
+// CreateCommand returns the `wtg create` command.
+func CreateCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:  "space",
-		Usage: "manage workspaces",
-		Commands: []*cli.Command{
-			{
-				Name:    "list",
-				Aliases: []string{"ls"},
-				Usage:   "list all spaces",
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return RunSpaceList(os.Stdout)
-				},
+		Name:          "create",
+		Usage:         "create a new workspace",
+		ArgsUsage:     "<name> [<repo>...]",
+		ShellComplete: completeReposAfterFirst,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "branch",
+				Usage: "branch name (default: <git.branch_prefix><name>)",
 			},
-			{
-				Name:          "create",
-				Usage:         "create a new workspace",
-				ArgsUsage:     "<name> [<repo>...]",
-				ShellComplete: completeReposAfterFirst,
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:  "branch",
-						Usage: "branch name (default: <git.branch_prefix><name>)",
-					},
-					&cli.StringFlag{
-						Name:  "path",
-						Usage: "workspace root path (default: <spaces.root_dir>/<name>)",
-					},
-					&cli.StringFlag{
-						Name:  "base",
-						Usage: "commit-ish to branch from (default: HEAD)",
-					},
-				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() == 0 {
-						return fmt.Errorf("missing required argument: <name>")
-					}
-					cfg, err := config.Load(cmd.Root().String("config"))
-					if err != nil {
-						return err
-					}
-					return RunSpaceCreate(cfg, runner, SpaceCreateArgs{
-						Name:   cmd.Args().First(),
-						Branch: cmd.String("branch"),
-						Path:   cmd.String("path"),
-						Base:   cmd.String("base"),
-						Repos:  cmd.Args().Tail(),
-					}, os.Stdout)
-				},
+			&cli.StringFlag{
+				Name:  "path",
+				Usage: "workspace root path (default: <spaces.root_dir>/<name>)",
 			},
-			{
-				Name:          "delete",
-				Aliases:       []string{"rm"},
-				Usage:         "remove a workspace's worktrees and optionally delete its branches",
-				ArgsUsage:     "<name>",
-				ShellComplete: completeSpaces,
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "d",
-						Usage: "delete branch if fully merged into upstream",
-					},
-					&cli.BoolFlag{
-						Name:  "D",
-						Usage: "force-delete branch regardless of merge state",
-					},
-				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() == 0 {
-						return fmt.Errorf("missing required argument: <name>")
-					}
-					return RunSpaceDelete(runner, SpaceDeleteArgs{
-						Name:         cmd.Args().First(),
-						DeleteBranch: cmd.Bool("d"),
-						ForceBranch:  cmd.Bool("D"),
-					}, os.Stdin, os.Stdout)
-				},
+			&cli.StringFlag{
+				Name:  "base",
+				Usage: "commit-ish to branch from (default: HEAD)",
 			},
-			{
-				Name:          "path",
-				Usage:         "print the root path of a space",
-				ArgsUsage:     "<name>",
-				ShellComplete: completeSpaces,
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() == 0 {
-						return fmt.Errorf("missing required argument: <name>")
-					}
-					sp, err := state.Load(cmd.Args().First())
-					if err != nil {
-						return err
-					}
-					fmt.Println(sp.Path)
-					return nil
-				},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() == 0 {
+				return fmt.Errorf("missing required argument: <name>")
+			}
+			cfg, err := config.Load(cmd.Root().String("config"))
+			if err != nil {
+				return err
+			}
+			return RunSpaceCreate(cfg, runner, SpaceCreateArgs{
+				Name:   cmd.Args().First(),
+				Branch: cmd.String("branch"),
+				Path:   cmd.String("path"),
+				Base:   cmd.String("base"),
+				Repos:  cmd.Args().Tail(),
+			}, os.Stdout)
+		},
+	}
+}
+
+// DeleteCommand returns the `wtg delete` command (alias: rm).
+func DeleteCommand(runner git.Runner) *cli.Command {
+	return &cli.Command{
+		Name:          "delete",
+		Aliases:       []string{"rm"},
+		Usage:         "remove a workspace's worktrees and optionally delete its branches",
+		ArgsUsage:     "<name>",
+		ShellComplete: completeSpaces,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "delete-branch",
+				Aliases: []string{"d"},
+				Usage:   "delete branch if fully merged into upstream",
 			},
-			{
-				Name:            "exec",
-				Usage:           "run a command in each worktree of a space",
-				ArgsUsage:       "<name> <cmd> [<args>...]",
-				ShellComplete:   completeSpaces,
-				SkipFlagParsing: true,
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() < 2 {
-						return fmt.Errorf("usage: wtg space exec <name> <cmd> [<args>...]")
-					}
-					return RunSpaceExec(cmd.Args().First(), cmd.Args().Tail(), os.Stdout)
-				},
+			&cli.BoolFlag{
+				Name:    "force-delete-branch",
+				Aliases: []string{"D"},
+				Usage:   "force-delete branch regardless of merge state",
 			},
-			{
-				Name:          "push",
-				Usage:         "push all branches in a space to origin",
-				ArgsUsage:     "<name>",
-				ShellComplete: completeSpaces,
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() == 0 {
-						return fmt.Errorf("missing required argument: <name>")
-					}
-					return RunSpacePush(runner, cmd.Args().First(), os.Stdout)
-				},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() == 0 {
+				return fmt.Errorf("missing required argument: <name>")
+			}
+			return RunSpaceDelete(runner, SpaceDeleteArgs{
+				Name:         cmd.Args().First(),
+				DeleteBranch: cmd.Bool("delete-branch"),
+				ForceBranch:  cmd.Bool("force-delete-branch"),
+			}, os.Stdin, os.Stdout)
+		},
+	}
+}
+
+// AddCommand returns the `wtg add` command.
+func AddCommand(runner git.Runner) *cli.Command {
+	return &cli.Command{
+		Name:          "add",
+		Usage:         "add repos to an existing workspace",
+		ArgsUsage:     "<name> <repo>...",
+		ShellComplete: completeSpaceThenRepos,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() < 2 {
+				return fmt.Errorf("usage: wtg add <name> <repo>")
+			}
+			cfg, err := config.Load(cmd.Root().String("config"))
+			if err != nil {
+				return err
+			}
+			return RunSpaceAdd(cfg, runner, SpaceAddArgs{
+				Name:  cmd.Args().First(),
+				Repos: cmd.Args().Tail(),
+			}, os.Stdout)
+		},
+	}
+}
+
+// RemoveCommand returns the `wtg remove` command.
+func RemoveCommand(runner git.Runner) *cli.Command {
+	return &cli.Command{
+		Name:          "remove",
+		Usage:         "remove repos from an existing workspace",
+		ArgsUsage:     "<name> <repo>...",
+		ShellComplete: completeSpaceMembers,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "delete-branch",
+				Aliases: []string{"d"},
+				Usage:   "delete branch if fully merged into upstream",
 			},
-			{
-				Name:          "rebase",
-				Usage:         "rebase all worktrees in a space onto origin's default branch",
-				ArgsUsage:     "<name>",
-				ShellComplete: completeSpaces,
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() == 0 {
-						return fmt.Errorf("missing required argument: <name>")
-					}
-					return RunSpaceRebase(runner, cmd.Args().First(), os.Stdout)
-				},
+			&cli.BoolFlag{
+				Name:    "force-delete-branch",
+				Aliases: []string{"D"},
+				Usage:   "force-delete branch regardless of merge state",
 			},
-			{
-				Name:          "status",
-				Aliases:       []string{"st"},
-				Usage:         "show status of workspaces (alias for wtg status)",
-				ArgsUsage:     "[<space>]",
-				ShellComplete: completeSpaces,
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "detailed",
-						Usage: "show individual modified files per repo",
-					},
-				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return RunSpaceStatus(runner, cmd.Args().Slice(), cmd.Bool("detailed"), os.Stdout)
-				},
-			},
-			{
-				Name:          "add",
-				Usage:         "add repos to an existing workspace",
-				ArgsUsage:     "<name> <repo>...",
-				ShellComplete: completeSpaceThenRepos,
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() < 2 {
-						return fmt.Errorf("usage: wtg space add <name> <repo>")
-					}
-					cfg, err := config.Load(cmd.Root().String("config"))
-					if err != nil {
-						return err
-					}
-					return RunSpaceAdd(cfg, runner, SpaceAddArgs{
-						Name:  cmd.Args().First(),
-						Repos: cmd.Args().Tail(),
-					}, os.Stdout)
-				},
-			},
-			{
-				Name:          "remove",
-				Usage:         "remove repos from an existing workspace",
-				ArgsUsage:     "<name> <repo>...",
-				ShellComplete: completeSpaceMembers,
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "d",
-						Usage: "delete branch if fully merged into upstream",
-					},
-					&cli.BoolFlag{
-						Name:  "D",
-						Usage: "force-delete branch regardless of merge state",
-					},
-				},
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() < 2 {
-						return fmt.Errorf("usage: wtg space remove <name> <repo>...")
-					}
-					return RunSpaceRemove(runner, SpaceRemoveArgs{
-						Name:         cmd.Args().First(),
-						Repos:        cmd.Args().Tail(),
-						DeleteBranch: cmd.Bool("d"),
-						ForceBranch:  cmd.Bool("D"),
-					}, os.Stdin, os.Stdout)
-				},
-			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() < 2 {
+				return fmt.Errorf("usage: wtg remove <name> <repo>...")
+			}
+			return RunSpaceRemove(runner, SpaceRemoveArgs{
+				Name:         cmd.Args().First(),
+				Repos:        cmd.Args().Tail(),
+				DeleteBranch: cmd.Bool("delete-branch"),
+				ForceBranch:  cmd.Bool("force-delete-branch"),
+			}, os.Stdin, os.Stdout)
+		},
+	}
+}
+
+// ExecCommand returns the `wtg exec` command.
+func ExecCommand() *cli.Command {
+	return &cli.Command{
+		Name:          "exec",
+		Usage:         "run a command in each worktree of a space",
+		ArgsUsage:     "<name> -- <cmd> [<args>...]",
+		ShellComplete: completeSpaceAtFirst,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() < 2 {
+				return fmt.Errorf("usage: wtg exec <name> -- <cmd> [<args>...]")
+			}
+			return RunSpaceExec(cmd.Args().First(), cmd.Args().Tail(), os.Stdout)
+		},
+	}
+}
+
+// PushCommand returns the `wtg push` command.
+func PushCommand(runner git.Runner) *cli.Command {
+	return &cli.Command{
+		Name:          "push",
+		Usage:         "push all branches in a space to origin",
+		ArgsUsage:     "<name>",
+		ShellComplete: completeSpaces,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() == 0 {
+				return fmt.Errorf("missing required argument: <name>")
+			}
+			return RunSpacePush(runner, cmd.Args().First(), os.Stdout)
+		},
+	}
+}
+
+// PathCommand returns the `wtg path` command (hidden; used by shell wcd functions).
+func PathCommand() *cli.Command {
+	return &cli.Command{
+		Name:          "path",
+		Usage:         "print the root path of a space",
+		ArgsUsage:     "<name>",
+		Hidden:        true,
+		ShellComplete: completeSpaces,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if cmd.Args().Len() == 0 {
+				return fmt.Errorf("missing required argument: <name>")
+			}
+			sp, err := state.Load(cmd.Args().First())
+			if err != nil {
+				return err
+			}
+			fmt.Println(sp.Path)
+			return nil
 		},
 	}
 }
 
 // =============================================================================
-// space list
-// =============================================================================
-
-// RunSpaceList prints a table of all spaces sorted by name. Each row shows the
-// space name, branch, workspace path, and number of repos.
-func RunSpaceList(out io.Writer) error {
-	spaces, err := state.List()
-	if err != nil {
-		return fmt.Errorf("list spaces: %w", err)
-	}
-	sort.Slice(spaces, func(i, j int) bool { return spaces[i].Name < spaces[j].Name })
-	tbl := ui.NewTableWriter(out)
-	for _, sp := range spaces {
-		names := make([]string, len(sp.Repos))
-		for i, r := range sp.Repos {
-			names[i] = r.Name
-		}
-		tbl.Row(sp.Name, sp.Branch, sp.Path, fmt.Sprintf("%d repos", len(sp.Repos)), strings.Join(names, ", "))
-	}
-	tbl.Flush()
-	return nil
-}
-
-// =============================================================================
-// space exec
+// exec
 // =============================================================================
 
 // RunSpaceExec runs a command in each worktree of the named space sequentially,
@@ -320,57 +282,7 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 }
 
 // =============================================================================
-// space rebase
-// =============================================================================
-
-// RunSpaceRebase fetches origin and rebases each worktree in the named space
-// onto origin's default branch, in parallel. Repos where rebase fails are
-// reported individually; the command itself returns nil so the caller can see
-// the full picture before acting.
-func RunSpaceRebase(runner git.Runner, spaceName string, out io.Writer) error {
-	sp, err := state.Load(spaceName)
-	if err != nil {
-		return fmt.Errorf("load space %q: %w", spaceName, err)
-	}
-
-	results := make([]opResult, len(sp.Repos))
-
-	var g errgroup.Group
-	for i, r := range sp.Repos {
-		g.Go(func() error {
-			defaultBranch, err := runner.DefaultBranch(r.RepoPath)
-			if err != nil {
-				results[i] = opResult{r.Name, ui.SymFail, fmt.Sprintf("default branch: %v", err)}
-				return nil
-			}
-			onto := "origin/" + defaultBranch
-			if err := runner.Rebase(r.WorktreePath, onto); err != nil {
-				results[i] = opResult{r.Name, ui.SymFail, err.Error()}
-			} else {
-				results[i] = opResult{r.Name, ui.SymOK, "rebased onto " + onto}
-			}
-			return nil
-		})
-	}
-	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
-
-	tbl := ui.NewTableWriter(out)
-	var failed []string
-	for _, r := range results {
-		tbl.Row(r.name, r.sym+" "+r.msg)
-		if r.sym == ui.SymFail {
-			failed = append(failed, r.name)
-		}
-	}
-	tbl.Flush()
-	if len(failed) > 0 {
-		return fmt.Errorf("rebase failed in: %s", strings.Join(failed, ", "))
-	}
-	return nil
-}
-
-// =============================================================================
-// space create
+// create
 // =============================================================================
 
 // SpaceCreateArgs holds the parsed arguments for RunSpaceCreate.
@@ -606,7 +518,7 @@ func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out i
 	}
 
 	if len(toRemove) == len(sp.Repos) {
-		return fmt.Errorf("cannot remove all repos from space %q; use `wtg space delete` instead", args.Name)
+		return fmt.Errorf("cannot remove all repos from space %q; use `wtg delete` instead", args.Name)
 	}
 
 	// Pre-flight: gather warnings about uncommitted or unpushed work.

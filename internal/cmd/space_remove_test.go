@@ -58,8 +58,8 @@ func TestRunSpaceRemove_AllRepos_Rejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when removing all repos")
 	}
-	if !strings.Contains(err.Error(), "space delete") {
-		t.Errorf("error should suggest space delete: %v", err)
+	if !strings.Contains(err.Error(), "wtg delete") {
+		t.Errorf("error should suggest wtg delete: %v", err)
 	}
 }
 
