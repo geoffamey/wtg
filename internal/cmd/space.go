@@ -26,11 +26,11 @@ import (
 	"github.com/geoffamey/wtg/internal/ui"
 )
 
-// CreateCommand returns the `wtg create` command.
+// CreateCommand returns the `wtg new` command.
 func CreateCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:          "create",
-		Usage:         "create a new workspace",
+		Name:          "new",
+		Usage:         "create a workspace",
 		ArgsUsage:     "<name> [<repo>...]",
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
@@ -66,12 +66,11 @@ func CreateCommand(runner git.Runner) *cli.Command {
 	}
 }
 
-// DeleteCommand returns the `wtg delete` command (alias: rm).
+// DeleteCommand returns the `wtg delete` command.
 func DeleteCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "delete",
-		Aliases:       []string{"rm"},
-		Usage:         "remove a workspace's worktrees and optionally delete its branches",
+		Usage:         "delete a workspace and optionally its branches",
 		ArgsUsage:     "<name>",
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
@@ -103,7 +102,7 @@ func DeleteCommand(runner git.Runner) *cli.Command {
 func AddCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "add",
-		Usage:         "add repos to an existing workspace",
+		Usage:         "add repos to a workspace",
 		ArgsUsage:     "<name> <repo>...",
 		ShellComplete: completeSpaceThenRepos,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -126,7 +125,7 @@ func AddCommand(runner git.Runner) *cli.Command {
 func RemoveCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "remove",
-		Usage:         "remove repos from an existing workspace",
+		Usage:         "remove repos from a workspace",
 		ArgsUsage:     "<name> <repo>...",
 		ShellComplete: completeSpaceMembers,
 		Flags: []cli.Flag{
@@ -159,7 +158,7 @@ func RemoveCommand(runner git.Runner) *cli.Command {
 func ExecCommand() *cli.Command {
 	return &cli.Command{
 		Name:          "exec",
-		Usage:         "run a command in each worktree of a space",
+		Usage:         "run a command in each repo of a workspace",
 		ArgsUsage:     "<name> -- <cmd> [<args>...]",
 		ShellComplete: completeSpaceAtFirst,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -175,7 +174,7 @@ func ExecCommand() *cli.Command {
 func PushCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "push",
-		Usage:         "push all branches in a space to origin",
+		Usage:         "push all branches in a workspace to origin",
 		ArgsUsage:     "<name>",
 		ShellComplete: completeSpaces,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -191,7 +190,7 @@ func PushCommand(runner git.Runner) *cli.Command {
 func PathCommand() *cli.Command {
 	return &cli.Command{
 		Name:          "path",
-		Usage:         "print the root path of a space",
+		Usage:         "print the root path of a workspace",
 		ArgsUsage:     "<name>",
 		Hidden:        true,
 		ShellComplete: completeSpaces,
