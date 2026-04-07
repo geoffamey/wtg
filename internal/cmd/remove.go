@@ -22,7 +22,7 @@ func RemoveCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "remove",
 		Usage:         "remove repos from a workspace",
-		ArgsUsage:     "<name> <repo>...",
+		ArgsUsage:     "<workspace> <repo>...",
 		ShellComplete: completeSpaceMembers,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -38,7 +38,7 @@ func RemoveCommand(runner git.Runner) *cli.Command {
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {
-				return fmt.Errorf("usage: wtg remove <name> <repo>...")
+				return fmt.Errorf("usage: wtg remove <workspace> <repo>...")
 			}
 			return RunSpaceRemove(runner, SpaceRemoveArgs{
 				Name:         cmd.Args().First(),

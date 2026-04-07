@@ -23,7 +23,7 @@ func DeleteCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "delete",
 		Usage:         "delete a workspace and optionally its branches",
-		ArgsUsage:     "<name>",
+		ArgsUsage:     "<workspace>",
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -39,7 +39,7 @@ func DeleteCommand(runner git.Runner) *cli.Command {
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() == 0 {
-				return fmt.Errorf("missing required argument: <name>")
+				return fmt.Errorf("missing required argument: <workspace>")
 			}
 			return RunSpaceDelete(runner, SpaceDeleteArgs{
 				Name:         cmd.Args().First(),

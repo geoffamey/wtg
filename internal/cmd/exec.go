@@ -18,11 +18,19 @@ func ExecCommand() *cli.Command {
 	return &cli.Command{
 		Name:          "exec",
 		Usage:         "run a command in each repo of a workspace",
-		ArgsUsage:     "<name> -- <cmd> [<args>...]",
+		ArgsUsage: "<workspace> -- <cmd> [<args>...]",
+		Description: `Runs a command in each repo's worktree sequentially, streaming output as
+it goes. A header line identifies each repo. Execution continues even if a
+command fails — all repos are attempted and failures are reported at the end.
+
+Use -- to separate the workspace name from the command:
+
+   wtg exec myfeature -- git status
+   wtg exec myfeature -- go test ./...`,
 		ShellComplete: completeSpaceAtFirst,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {
-				return fmt.Errorf("usage: wtg exec <name> -- <cmd> [<args>...]")
+				return fmt.Errorf("usage: wtg exec <workspace> -- <cmd> [<args>...]")
 			}
 			return RunSpaceExec(cmd.Args().First(), cmd.Args().Tail(), os.Stdout)
 		},

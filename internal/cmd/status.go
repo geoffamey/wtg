@@ -24,7 +24,7 @@ func StatusCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "status",
 		Usage:         "show status of repos and workspaces",
-		ArgsUsage:     "[<space>]",
+		ArgsUsage:     "[<workspace>]",
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{

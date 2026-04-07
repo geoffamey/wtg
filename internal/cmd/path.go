@@ -15,12 +15,12 @@ func PathCommand() *cli.Command {
 	return &cli.Command{
 		Name:          "path",
 		Usage:         "print the root path of a workspace",
-		ArgsUsage:     "<name>",
+		ArgsUsage:     "<workspace>",
 		Hidden:        true,
 		ShellComplete: completeSpaces,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() == 0 {
-				return fmt.Errorf("missing required argument: <name>")
+				return fmt.Errorf("missing required argument: <workspace>")
 			}
 			sp, err := state.Load(cmd.Args().First())
 			if err != nil {

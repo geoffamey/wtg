@@ -20,11 +20,11 @@ func PushCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "push",
 		Usage:         "push all branches in a workspace to origin",
-		ArgsUsage:     "<name>",
+		ArgsUsage:     "<workspace>",
 		ShellComplete: completeSpaces,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() == 0 {
-				return fmt.Errorf("missing required argument: <name>")
+				return fmt.Errorf("missing required argument: <workspace>")
 			}
 			return RunSpacePush(runner, cmd.Args().First(), os.Stdout)
 		},

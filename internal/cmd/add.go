@@ -22,11 +22,11 @@ func AddCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "add",
 		Usage:         "add repos to a workspace",
-		ArgsUsage:     "<name> <repo>...",
+		ArgsUsage:     "<workspace> <repo>...",
 		ShellComplete: completeSpaceThenRepos,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {
-				return fmt.Errorf("usage: wtg add <name> <repo>")
+				return fmt.Errorf("usage: wtg add <workspace> <repo>")
 			}
 			cfg, err := config.Load(cmd.Root().String("config"))
 			if err != nil {

@@ -24,16 +24,22 @@ func NewCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "new",
 		Usage:         "create a workspace",
-		ArgsUsage:     "<name> [<repo>...]",
+		ArgsUsage:     "<workspace> [<repo>...]",
+		Description: `Creates a workspace: a directory containing one linked git worktree per
+repo, all on the same branch. A go.work file is written automatically when
+any of the included repos have a go.mod.
+
+If no repos are specified, all repos discovered under discovery.root_dir
+are included.`,
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "branch",
-				Usage: "branch name (default: <git.branch_prefix><name>)",
+				Usage: "branch name (default: <git.branch_prefix><workspace>)",
 			},
 			&cli.StringFlag{
 				Name:  "path",
-				Usage: "workspace root path (default: <spaces.root_dir>/<name>)",
+				Usage: "workspace root path (default: <spaces.root_dir>/<workspace>)",
 			},
 			&cli.StringFlag{
 				Name:  "base",
@@ -42,7 +48,7 @@ func NewCommand(runner git.Runner) *cli.Command {
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() == 0 {
-				return fmt.Errorf("missing required argument: <name>")
+				return fmt.Errorf("missing required argument: <workspace>")
 			}
 			cfg, err := config.Load(cmd.Root().String("config"))
 			if err != nil {
