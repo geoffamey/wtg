@@ -33,16 +33,16 @@ end
 
 Since `cd` must run in the current shell, add a small wrapper function:
 
+**bash / zsh:**
+```bash
+wcd() { cd "$(wtg path "$1")"; }
+```
+
 **fish:**
 ```fish
 function wcd
     cd (wtg path $argv[1])
 end
-```
-
-**bash / zsh:**
-```bash
-wcd() { cd "$(wtg path "$1")"; }
 ```
 
 ## Configuration
