@@ -20,8 +20,8 @@ import (
 // RemoveCommand returns the `wtg remove` command.
 func RemoveCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:    "remove",
-		Aliases: []string{"rm"},
+		Name:      "remove",
+		Aliases:   []string{"rm"},
 		Usage:     "remove repos from a workspace",
 		ArgsUsage: "<workspace> <repo>...",
 		Description: `Removes the specified repos' worktrees from a workspace and updates go.work.
@@ -45,7 +45,7 @@ commits. To remove all repos at once, use wtg delete instead.`,
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {
-				return fmt.Errorf("usage: wtg remove <workspace> <repo>...")
+				return fmt.Errorf("usage: wtg remove <workspace> <repo>...") //nolint:staticcheck // It's ok that this ends with punctuation
 			}
 			return RunSpaceRemove(runner, SpaceRemoveArgs{
 				Name:         cmd.Args().First(),
