@@ -24,7 +24,13 @@ func StatusCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "status",
 		Usage:         "show status of repos and workspaces",
-		ArgsUsage:     "[<workspace>]",
+		ArgsUsage: "[<workspace>]",
+		Description: `Without arguments, shows a combined view: main repo clone status at the top,
+then per-repo status for every workspace. If the current directory is inside
+a known workspace, only that workspace is shown in detail.
+
+Pass one or more workspace names to show those workspaces explicitly.
+Use --long (-l) to expand each dirty repo with its individual file changes.`,
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{

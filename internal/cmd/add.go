@@ -22,7 +22,10 @@ func AddCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "add",
 		Usage:         "add repos to a workspace",
-		ArgsUsage:     "<workspace> <repo>...",
+		ArgsUsage: "<workspace> <repo>...",
+		Description: `Creates a new worktree for each specified repo inside an existing workspace,
+checking out the workspace's branch. Updates go.work automatically if the
+workspace already has one.`,
 		ShellComplete: completeSpaceThenRepos,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {

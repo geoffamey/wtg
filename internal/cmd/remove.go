@@ -22,7 +22,13 @@ func RemoveCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "remove",
 		Usage:         "remove repos from a workspace",
-		ArgsUsage:     "<workspace> <repo>...",
+		ArgsUsage: "<workspace> <repo>...",
+		Description: `Removes the specified repos' worktrees from a workspace and updates go.work.
+By default, branches are left untouched — use --delete-branch (-d) or
+--force-delete-branch (-D) to also delete them.
+
+Prompts for confirmation if any repo has uncommitted changes or unpushed
+commits. To remove all repos at once, use wtg delete instead.`,
 		ShellComplete: completeSpaceMembers,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{

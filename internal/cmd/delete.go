@@ -23,7 +23,14 @@ func DeleteCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "delete",
 		Usage:         "delete a workspace and optionally its branches",
-		ArgsUsage:     "<workspace>",
+		ArgsUsage: "<workspace>",
+		Description: `Removes all worktrees in the workspace. By default, branches are left
+untouched — use --delete-branch (-d) to delete merged branches or
+--force-delete-branch (-D) to force-delete regardless of merge state.
+
+Prompts for confirmation if any repo has uncommitted changes or unpushed
+commits. The workspace root directory is removed if it is empty after
+worktrees are cleaned up.`,
 		ShellComplete: completeSpaces,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{

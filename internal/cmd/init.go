@@ -20,6 +20,14 @@ func InitCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "init",
 		Usage: "interactive setup wizard — creates the wtg config file",
+		Description: `Prompts for the three core settings and writes them to the config file
+(default: $XDG_CONFIG_HOME/wtg/config.yaml):
+
+  discovery.root_dir   where wtg scans for git repos
+  spaces.root_dir      where new workspaces are created
+  git.branch_prefix    prefix prepended to workspace names to form branch names
+
+Use --defaults to accept all defaults without prompting.`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "defaults",

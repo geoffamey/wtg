@@ -29,11 +29,18 @@ func RepoCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:  "repo",
 		Usage: "manage repositories",
+		Description: `Operates on the main repo clones (not workspace worktrees). Use these
+commands to inspect and update the clones that wtg discovers under
+discovery.root_dir.`,
 		Commands: []*cli.Command{
 			{
-				Name:          "status",
-				Usage:         "show status of main repo clones",
-				ArgsUsage:     "[<repo>...]",
+				Name:      "status",
+				Usage:     "show status of main repo clones",
+				ArgsUsage: "[<repo>...]",
+				Description: `Shows branch, dirty status, and ahead/behind counts for each discovered
+repo clone. Without arguments, all repos are shown. Pass repo names to
+filter the output. Use --long (-l) to also show each repo's remote URL
+and local path.`,
 				ShellComplete: completeRepos,
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
@@ -51,9 +58,11 @@ func RepoCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
-				Name:          "fetch",
-				Usage:         "fetch from origin for all repos (no fast-forward)",
-				ArgsUsage:     "[<repo>...]",
+				Name:      "fetch",
+				Usage:     "fetch from origin for all repos (no fast-forward)",
+				ArgsUsage: "[<repo>...]",
+				Description: `Downloads new commits from origin for each repo without updating any
+local branches (equivalent to git fetch origin). Runs in parallel.`,
 				ShellComplete: completeRepos,
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					cfg, err := config.Load(cmd.String("config"))
@@ -64,9 +73,12 @@ func RepoCommand(runner git.Runner) *cli.Command {
 				},
 			},
 			{
-				Name:          "sync",
-				Usage:         "fetch and fast-forward repos to origin's default branch",
-				ArgsUsage:     "[<repo>...]",
+				Name:      "sync",
+				Usage:     "fetch and fast-forward repos to origin's default branch",
+				ArgsUsage: "[<repo>...]",
+				Description: `Fetches origin and fast-forwards each repo's default branch (main, master,
+etc.) if it has no local changes. Repos with uncommitted changes or a
+diverged branch are skipped with a warning. Runs in parallel.`,
 				ShellComplete: completeRepos,
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					cfg, err := config.Load(cmd.String("config"))

@@ -20,7 +20,9 @@ func PushCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
 		Name:          "push",
 		Usage:         "push all branches in a workspace to origin",
-		ArgsUsage:     "<workspace>",
+		ArgsUsage: "<workspace>",
+		Description: `Pushes the workspace's branch from each repo's worktree to origin in
+parallel. Repos that fail are reported individually; others are not affected.`,
 		ShellComplete: completeSpaces,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() == 0 {
