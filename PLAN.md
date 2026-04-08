@@ -37,5 +37,5 @@ change — work through them one at a time.
 ### Cleanup
 
 - [x] **C11** — Remove the now-empty `wtg space` command group (after C1–C8 and C9–C10)
-- [ ] **C12** — Update README and all help strings to reflect new command paths
-- [ ] **C13** — Update shell completion handlers for renamed/moved commands
+- [x] **C12** — Update README and all help strings to reflect new command paths
+- [x] **C13** — Update shell completion handlers for renamed/moved commands

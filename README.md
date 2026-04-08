@@ -10,6 +10,23 @@
 go install github.com/geoffamey/wtg@latest
 ```
 
+### Shell completions
+
+**fish:**
+```fish
+wtg completion fish > ~/.config/fish/completions/wtg.fish
+```
+
+**bash** — add to `~/.bashrc`:
+```bash
+source <(wtg completion bash)
+```
+
+**zsh** — add to `~/.zshrc`:
+```zsh
+source <(wtg completion zsh)
+```
+
 ### `wcd` — jump into a workspace
 
 Since `cd` must run in the current shell, add a small wrapper function:
