@@ -2,7 +2,7 @@
 
 `wtg` manages feature branches that span multiple repos. When a feature touches several repos at once, `wtg` checks out a shared branch across all of them as [git worktrees](https://git-scm.com/docs/git-worktree) and wires them together with a `go.work` file — giving you an isolated, ready-to-build workspace per feature without cloning anything new.
 
-> New to worktrees? The [Atlassian worktree guide](https://www.atlassian.com/git/tutorials/git-worktree) is a good primer.
+> New to worktrees? The [GitKraken worktree guide](https://www.gitkraken.com/learn/git/git-worktree) is a good primer.
 
 ## Installation
 
