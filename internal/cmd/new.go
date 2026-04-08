@@ -30,7 +30,8 @@ repo, all on the same branch. A go.work file is written automatically when
 any of the included repos have a go.mod.
 
 If no repos are specified, all repos discovered under discovery.root_dir
-are included.`,
+are included. If the branch already exists in a repo it is checked out
+as-is — no reset or rebase is performed.`,
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
 			&cli.StringFlag{

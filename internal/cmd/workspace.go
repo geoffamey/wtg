@@ -174,14 +174,25 @@ func worktreeStep(runner git.Runner, t *repoTarget, branch, base string) saga.St
 	return saga.Step{
 		Name: fmt.Sprintf("create worktree %s", t.name),
 		Do: func(ctx context.Context) error {
-			if err := os.MkdirAll(filepath.Dir(t.worktreePath), 0o755); err != nil {
+			parentDir := filepath.Dir(t.worktreePath)
+			if err := os.MkdirAll(parentDir, 0o755); err != nil {
 				return fmt.Errorf("create parent dir: %w", err)
 			}
-			return runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, base, t.createBranch)
+			if err := runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, base, t.createBranch); err != nil {
+				// Clean up the dir we just created; ignore error (may not be empty
+				// if another worktree in the same space already populated it).
+				_ = os.Remove(parentDir)
+				return err
+			}
+			return nil
 		},
 		Undo: func(ctx context.Context) error {
-			if err := runner.WorktreeRemove(t.repoPath, t.worktreePath, true); err != nil {
-				return err
+			removeErr := runner.WorktreeRemove(t.repoPath, t.worktreePath, true)
+			// Clean up the parent dir created by MkdirAll; os.Remove is a no-op
+			// if the dir is non-empty or does not exist.
+			_ = os.Remove(filepath.Dir(t.worktreePath))
+			if removeErr != nil {
+				return removeErr
 			}
 			if t.createBranch {
 				return runner.BranchDelete(t.repoPath, branch, true)
