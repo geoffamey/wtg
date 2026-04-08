@@ -1,8 +1,8 @@
 # wtg
 
-Manage multi-repo feature workflows using git worktrees and Go workspaces.
+`wtg` manages feature branches that span multiple repos. When a feature touches several repos at once, `wtg` checks out a shared branch across all of them as [git worktrees](https://git-scm.com/docs/git-worktree) and wires them together with a `go.work` file — giving you an isolated, ready-to-build workspace per feature without cloning anything new.
 
-When a feature spans multiple repos, `wtg` checks out a shared branch across all of them as git worktrees and wires them together with a `go.work` file.
+> New to worktrees? The [Atlassian worktree guide](https://www.atlassian.com/git/tutorials/git-worktree) is a good primer.
 
 ## Installation
 
@@ -10,155 +10,162 @@ When a feature spans multiple repos, `wtg` checks out a shared branch across all
 go install github.com/geoffamey/wtg@latest
 ```
 
-### Shell completions
+### `wcd` — jump into a workspace
 
-**fish:**
-```fish
-wtg completion fish > ~/.config/fish/completions/wtg.fish
-```
-
-**bash** — add to `~/.bashrc`:
-```bash
-source <(wtg completion bash)
-```
-
-**zsh** — add to `~/.zshrc`:
-```zsh
-source <(wtg completion zsh)
-```
-
-### `wcd` — cd into a space
-
-Since `cd` must run in the current shell, add a wrapper function. `wtg space path <name>` prints the space's root path.
+Since `cd` must run in the current shell, add a small wrapper function:
 
 **fish:**
 ```fish
 function wcd
-    cd (wtg space path $argv[1])
+    cd (wtg path $argv[1])
 end
 ```
 
 **bash / zsh:**
 ```bash
-wcd() {
-    cd "$(wtg space path "$1")"
-}
+wcd() { cd "$(wtg path "$1")"; }
 ```
-
-## Concepts
-
-- **Repo** — a git repository discovered under `discovery.root_dir`
-- **Space** — a named workspace: worktrees of selected repos on a shared branch, linked by a `go.work`
 
 ## Configuration
 
-Run `wtg init` for an interactive setup, or create `~/.config/wtg/config.yaml` directly:
+Run `wtg init` to create `~/.config/wtg/config.yaml` interactively:
+
+```sh
+wtg init
+```
+
+Or write the config directly:
 
 ```yaml
 discovery:
-  root_dir: ~/repos       # where to scan for git repositories
-  max_depth: 2            # scan depth (default: 2)
+  root_dir: ~/repos       # where wtg scans for git repos
+  max_depth: 2
 
 spaces:
-  root_dir: ~/workspaces  # where to create workspace directories
+  root_dir: ~/workspaces  # where workspaces are created
 
 git:
-  branch_prefix: ""       # optional prefix for created branches, e.g. "yourname/"
+  branch_prefix: ""       # prepended to workspace names, e.g. "geoff/"
 ```
 
-Override any key with `--config <path>`, `WTG_CONFIG=<path>`, or env vars like `WTG_GIT_BRANCH_PREFIX=geoff/`.
+Override with `--config <path>` or the `WTG_CONFIG` environment variable.
 
-## Commands
+## Quick start
 
-### `wtg repo sync [<repo>...]`
+```sh
+# Create a workspace for a new feature across three repos
+wtg new my-feature api payments frontend
 
-Fetch and fast-forward each repo's default branch. Skips repos that are dirty or not on the default branch. Syncs all discovered repos if none are specified.
+# Jump in
+wcd my-feature
 
-### `wtg repo status [<repo>...] [--long]`
+# ... do your work, then clean up
+wtg delete my-feature --delete-branch
+```
 
-Show branch, working-tree state, and ahead/behind counts for each repo's main clone. Pass `--long` (`-l`) to also show the remote URL and local path.
+## Workspace commands
 
-### `wtg space create <name> [<repo>...] [--branch <branch>] [--path <dir>]`
+### `wtg new <workspace> [<repo>...]`
 
-Create a workspace. For each repo, creates or checks out a branch named `<prefix><name>` and adds a linked worktree. Writes a `go.work` for any repos with a `go.mod`. Uses all discovered repos if none are specified.
+Create a workspace. For each repo, `wtg` creates or checks out a branch named
+`<branch_prefix><workspace>` as a linked worktree. A `go.work` file is written
+automatically for repos that have a `go.mod`. If no repos are specified, all
+discovered repos are included.
 
-**Branch behaviour per repo:**
+```sh
+wtg new my-feature api payments frontend
+wtg new my-feature                          # include all discovered repos
+wtg new my-feature api --branch geoff/main  # check out an existing branch
+```
+
+Branch behaviour per repo:
 
 | Branch state | Action |
 |---|---|
-| Does not exist | Created from HEAD of the repo's default branch |
+| Does not exist | Created from the repo's default branch |
 | Exists, not checked out | Checked out in the new worktree |
-| Exists, already checked out elsewhere | Error |
+| Exists, already checked out | Error |
 
-### `wtg space list`
+### `wtg delete <workspace>`
 
-List all spaces with their branch, path, and repo count.
+Delete a workspace and remove its worktrees. Prompts for confirmation if any
+repo has uncommitted changes or unpushed commits.
 
-### `wtg space add <name> <repo>...`
-
-Add repos to an existing space. Creates worktrees on the space's branch and updates `go.work`.
-
-### `wtg space delete <name> [-d | -D]`
-
-Remove a space's worktrees. Prompts for confirmation if any worktree has uncommitted changes or unpushed commits.
-
-| Flag | Branch behaviour |
-|------|-----------------|
-| (none) | Branches left untouched |
-| `-d` | Delete branches fully merged into upstream |
-| `-D` | Force-delete branches |
-
-### `wtg status [<name>] [--detailed]`
-
-Show workspace status.
-
-- **No args, inside a workspace**: status of the current space
-- **No args, outside a workspace**: summary of all spaces
-- **`<name>`**: status of the named space
-
-Summary view:
-```
-myfeature    geoff/myfeature   ~/workspaces/myfeature   3 repos
-otherthing   geoff/otherthing  ~/workspaces/otherthing   2 repos
+```sh
+wtg delete my-feature            # remove worktrees, keep branches
+wtg delete my-feature -d         # also delete branches if merged
+wtg delete my-feature -D         # force-delete branches
 ```
 
-Space view (one row per repo):
-```
-myfeature   geoff/myfeature   ~/workspaces/myfeature   3 repos
-  api       [geoff/myfeature]  ✓ clean     ↑2 ↓0
-  frontend  [geoff/myfeature]  ✗ 3 modified, 1 untracked
-  payments  [geoff/myfeature]  ✓ clean     ↑0 ↓0
-```
+### `wtg add <workspace> <repo>...`
 
-Detailed view (`--detailed` — lists modified files per repo):
-```
-myfeature   geoff/myfeature   ~/workspaces/myfeature   3 repos
-  api       [geoff/myfeature]  ✓ clean     ↑2 ↓0
-  frontend  [geoff/myfeature]  ✗ 3 modified, 1 untracked
-    M  src/handler.go
-    M  src/middleware.go
-    ?? src/newfile.go
-  payments  [geoff/myfeature]  ✓ clean     ↑0 ↓0
+Add repos to an existing workspace. Creates worktrees on the workspace's branch
+and updates `go.work`.
+
+```sh
+wtg add my-feature infra logging
 ```
 
-## Data layout
+### `wtg remove <workspace> <repo>...`
 
-```
-~/.config/wtg/config.yaml        # configuration
-~/.local/share/wtg/spaces/        # space state
-  myfeature.yaml
+Remove repos from a workspace. Prompts if there are uncommitted changes or
+unpushed commits. Use `wtg delete` to remove the whole workspace.
 
-~/repos/                          # your main clones (discovered by wtg)
-  api/
-  infra/
-
-~/workspaces/myfeature/           # worktrees created by wtg
-  api/
-  infra/
-  go.work
+```sh
+wtg remove my-feature logging
+wtg remove my-feature logging -d  # also delete the branch
 ```
 
-## Future work
+### `wtg status [<workspace>]`
 
-- `space rename <old> <new>` — rename a space and its directory
-- `repo clone <url>` — clone into `discovery.root_dir` and make available immediately
+Show workspace status. Without arguments, shows all workspaces — or just the
+current one if you're inside a workspace directory. Pass `--long` / `-l` to
+expand file-level changes per repo.
+
+```sh
+wtg status
+wtg status my-feature
+wtg status my-feature --long
+```
+
+```
+my-feature  geoff/my-feature  ~/workspaces/my-feature
+  api       [geoff/my-feature]  ✓ clean      ↑2 ↓0
+  payments  [geoff/my-feature]  ✗ 2 modified
+  frontend  [geoff/my-feature]  ✓ clean      ↑0 ↓0
+```
+
+### `wtg exec <workspace> -- <cmd> [<args>...]`
+
+Run a command in each repo's worktree sequentially. Execution continues even if
+a command fails — all repos are attempted and failures are reported at the end.
+
+```sh
+wtg exec my-feature -- git status
+wtg exec my-feature -- go test ./...
+wtg exec my-feature -- git push origin HEAD
+```
+
+## Repo commands
+
+These operate on your main repo clones, not workspace worktrees. Useful for
+keeping clones up to date before starting a new feature.
+
+### `wtg repo sync [<repo>...]`
+
+Fetch and fast-forward each repo's default branch. Repos with local changes are
+skipped with a warning.
+
+```sh
+wtg repo sync               # sync all repos
+wtg repo sync api payments  # sync specific repos
+```
+
+### `wtg repo status [<repo>...]`
+
+Show branch, dirty status, and ahead/behind counts for each main repo clone.
+
+```sh
+wtg repo status
+wtg repo status --long  # also show remote URL and local path
+```
