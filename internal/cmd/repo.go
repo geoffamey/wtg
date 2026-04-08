@@ -24,6 +24,20 @@ type opResult struct {
 	msg  string
 }
 
+// render returns a styled "symbol message" string for use in table output.
+func (r opResult) render() string {
+	switch r.sym {
+	case ui.SymOK, ui.SymUp:
+		return ui.OK.Render(r.sym) + " " + r.msg
+	case ui.SymWarn:
+		return ui.Warn.Render(r.sym) + " " + ui.Muted.Render(r.msg)
+	case ui.SymFail:
+		return ui.Fail.Render(r.sym + " " + r.msg)
+	default:
+		return r.sym + " " + r.msg
+	}
+}
+
 // RepoCommand returns the `wtg repo` command with its subcommands.
 func RepoCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
@@ -163,7 +177,7 @@ func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Write
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {
-		tbl.Row(r.name, r.sym+" "+r.msg)
+		tbl.Row(r.name, r.render())
 	}
 	tbl.Flush()
 	return nil
@@ -197,7 +211,7 @@ func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer
 
 	tbl := ui.NewTableWriter(out)
 	for _, r := range results {
-		tbl.Row(r.name, r.sym+" "+r.msg)
+		tbl.Row(r.name, r.render())
 	}
 	tbl.Flush()
 	return nil

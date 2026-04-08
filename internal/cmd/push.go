@@ -58,7 +58,7 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 	tbl := ui.NewTableWriter(out)
 	var failed []string
 	for _, r := range results {
-		tbl.Row(r.name, r.sym+" "+r.msg)
+		tbl.Row(r.name, r.render())
 		if r.sym == ui.SymFail {
 			failed = append(failed, r.name)
 		}
