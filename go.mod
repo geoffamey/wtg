@@ -12,7 +12,7 @@ require (
 	github.com/urfave/cli/v3 v3.8.0
 	go.yaml.in/yaml/v3 v3.0.3
 	golang.org/x/mod v0.34.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
