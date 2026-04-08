@@ -146,10 +146,10 @@ wtg status my-feature --long
 ```
 
 ```
-my-feature  geoff/my-feature  ~/workspaces/my-feature
-  api       [geoff/my-feature]  ✓ clean      ↑2 ↓0
-  payments  [geoff/my-feature]  ✗ 2 modified
-  frontend  [geoff/my-feature]  ✓ clean      ↑0 ↓0
+my-feature  ~/workspaces/my-feature
+  api       [geoff/my-feature]  ✓ clean      ↑2
+  payments  [geoff/my-feature]  ! 2 modified
+  frontend  [geoff/my-feature]  ✓ clean
 ```
 
 ### `wtg exec <workspace> -- <cmd> [<args>...]`
