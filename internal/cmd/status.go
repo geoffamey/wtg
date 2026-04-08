@@ -22,8 +22,8 @@ import (
 // StatusCommand returns the top-level `wtg status` command.
 func StatusCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:          "status",
-		Usage:         "show status of repos and workspaces",
+		Name:      "status",
+		Usage:     "show status of repos and workspaces",
 		ArgsUsage: "[<workspace>]",
 		Description: `Without arguments, shows a combined view: main repo clone status at the top,
 then per-repo status for every workspace. If the current directory is inside
@@ -191,4 +191,3 @@ func worktreeStatusCols(st git.RepoStatus, err error, spaceBranch string) []stri
 		aheadBehindCol(st.Ahead, st.Behind, st.Upstream != ""),
 	}
 }
-

@@ -10,7 +10,6 @@ import (
 	"github.com/geoffamey/wtg/internal/ui"
 )
 
-
 func alwaysStatus(st git.RepoStatus) func(string) (git.RepoStatus, error) {
 	return func(_ string) (git.RepoStatus, error) { return st, nil }
 }

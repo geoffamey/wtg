@@ -178,7 +178,9 @@ func TestRunRepoStatus_Long(t *testing.T) {
 	apiPath := makeRepo(t, root, "api")
 
 	r := &testRunner{
-		statusFn:        func(string) (git.RepoStatus, error) { return git.RepoStatus{Branch: "main", Upstream: "origin/main"}, nil },
+		statusFn: func(string) (git.RepoStatus, error) {
+			return git.RepoStatus{Branch: "main", Upstream: "origin/main"}, nil
+		},
 		defaultBranchFn: func(string) (string, error) { return "main", nil },
 		remoteURLFn: func(repoPath, remote string) (string, error) {
 			return "https://github.com/org/api.git", nil

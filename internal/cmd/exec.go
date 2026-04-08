@@ -16,8 +16,8 @@ import (
 // ExecCommand returns the `wtg exec` command.
 func ExecCommand() *cli.Command {
 	return &cli.Command{
-		Name:          "exec",
-		Usage:         "run a command in each repo of a workspace",
+		Name:      "exec",
+		Usage:     "run a command in each repo of a workspace",
 		ArgsUsage: "<workspace> -- <cmd> [<args>...]",
 		Description: `Runs a command in each repo's worktree sequentially, streaming output as
 it goes. A header line identifies each repo. Execution continues even if a

@@ -112,4 +112,3 @@ func TestDiscoverRepoPaths_Empty(t *testing.T) {
 		t.Errorf("got %d paths, want 0", len(paths))
 	}
 }
-

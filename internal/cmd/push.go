@@ -18,8 +18,8 @@ import (
 // PushCommand returns the `wtg push` command.
 func PushCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:          "push",
-		Usage:         "push all branches in a workspace to origin",
+		Name:      "push",
+		Usage:     "push all branches in a workspace to origin",
 		ArgsUsage: "<workspace>",
 		Description: `Pushes the workspace's branch from each repo's worktree to origin in
 parallel. Repos that fail are reported individually; others are not affected.`,

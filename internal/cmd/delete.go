@@ -21,8 +21,8 @@ import (
 // DeleteCommand returns the `wtg delete` command.
 func DeleteCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:          "delete",
-		Usage:         "delete a workspace and optionally its branches",
+		Name:      "delete",
+		Usage:     "delete a workspace and optionally its branches",
 		ArgsUsage: "<workspace>",
 		Description: `Removes all worktrees in the workspace. By default, branches are left
 untouched — use --delete-branch (-d) to delete merged branches or

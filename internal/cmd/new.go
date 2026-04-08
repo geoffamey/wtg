@@ -22,9 +22,9 @@ import (
 // NewCommand returns the `wtg new` command.
 func NewCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:          "new",
-		Usage:         "create a workspace",
-		ArgsUsage:     "<workspace> [<repo>...]",
+		Name:      "new",
+		Usage:     "create a workspace",
+		ArgsUsage: "<workspace> [<repo>...]",
 		Description: `Creates a workspace: a directory containing one linked git worktree per
 repo, all on the same branch. A go.work file is written automatically when
 any of the included repos have a go.mod.
