@@ -13,8 +13,34 @@ import (
 	"github.com/geoffamey/wtg/internal/state"
 )
 
+// emitFlags prints all visible flags for cmd in --name:usage form, for use by
+// ShellComplete handlers that otherwise only emit positional completions.
+// The colon-separated format is parsed by the fish completion script to show
+// descriptions alongside flag names.
+func emitFlags(cmd *cli.Command) {
+	for _, f := range cmd.VisibleFlags() {
+		usage := ""
+		if df, ok := f.(cli.DocGenerationFlag); ok {
+			usage = df.GetUsage()
+		}
+		for _, name := range f.Names() {
+			var flag string
+			if len(name) == 1 {
+				flag = "-" + name
+			} else {
+				flag = "--" + name
+			}
+			if usage != "" {
+				fmt.Printf("%s:%s\n", flag, usage)
+			} else {
+				fmt.Println(flag)
+			}
+		}
+	}
+}
+
 // completeSpaces outputs space names for shell completion.
-func completeSpaces(_ context.Context, _ *cli.Command) {
+func completeSpaces(_ context.Context, cmd *cli.Command) {
 	spaces, err := state.List()
 	if err != nil {
 		return
@@ -23,6 +49,7 @@ func completeSpaces(_ context.Context, _ *cli.Command) {
 	for _, sp := range spaces {
 		fmt.Println(sp.Name)
 	}
+	emitFlags(cmd)
 }
 
 // completeRepos outputs discovered repo names for shell completion.
@@ -40,6 +67,7 @@ func completeRepos(_ context.Context, cmd *cli.Command) {
 		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
 		fmt.Fprintln(os.Stdout, name)
 	}
+	emitFlags(cmd)
 }
 
 // completeSpaceAtFirst completes a space name only at position 0.
@@ -58,6 +86,8 @@ func completeSpaceAtFirst(ctx context.Context, cmd *cli.Command) {
 func completeReposAfterFirst(ctx context.Context, cmd *cli.Command) {
 	if cmd.NArg() >= 2 {
 		completeRepos(ctx, cmd)
+	} else {
+		emitFlags(cmd)
 	}
 }
 
@@ -86,4 +116,5 @@ func completeSpaceMembers(ctx context.Context, cmd *cli.Command) {
 	for _, r := range sp.Repos {
 		fmt.Println(r.Name)
 	}
+	emitFlags(cmd)
 }
