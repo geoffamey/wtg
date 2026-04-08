@@ -2,11 +2,12 @@
 package ui
 
 import (
+	"fmt"
 	"io"
 	"strings"
-	"text/tabwriter"
 
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 )
 
 // Symbols used in status output.
@@ -34,29 +35,37 @@ func SectionHeader(label string) string {
 	return Header.Render(label) + " " + Muted.Render(strings.Repeat("─", ruleLen))
 }
 
-// Table is a tab-aligned columnar writer. Call Row for each line, then Flush.
-// Columns are separated by \t; tabwriter handles alignment.
+// Table is an ANSI-aware columnar writer. Call Row for each line, then Flush.
+// Columns are padded to the widest value using lipgloss's table package, which
+// measures visual width rather than byte length so styled cells align correctly.
 type Table struct {
-	w *tabwriter.Writer
+	w   io.Writer
+	tbl *table.Table
 }
 
 // NewTableWriter returns a Table writing to w.
 func NewTableWriter(w io.Writer) *Table {
-	return &Table{w: tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)}
+	tbl := table.New().
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderColumn(false).
+		BorderHeader(false).
+		StyleFunc(func(_, _ int) lipgloss.Style {
+			return lipgloss.NewStyle().PaddingRight(2)
+		})
+	return &Table{w: w, tbl: tbl}
 }
 
-// Row writes one row. Fields are separated by tab stops for alignment.
+// Row writes one row. Fields are padded per-column for alignment.
 func (t *Table) Row(fields ...string) {
-	for i, f := range fields {
-		if i > 0 {
-			t.w.Write([]byte("\t"))
-		}
-		t.w.Write([]byte(f))
-	}
-	t.w.Write([]byte("\n"))
+	t.tbl.Row(fields...)
 }
 
-// Flush finalises the tabwriter alignment and flushes all output.
+// Flush finalises the table alignment and writes all output.
 func (t *Table) Flush() {
-	t.w.Flush()
+	if s := t.tbl.String(); s != "" {
+		fmt.Fprintln(t.w, s)
+	}
 }

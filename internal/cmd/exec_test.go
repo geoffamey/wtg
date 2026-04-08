@@ -46,7 +46,7 @@ func TestRunSpaceExec_RunsInEachWorktree(t *testing.T) {
 		t.Fatalf("RunSpaceExec: %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "=== api ===") || !strings.Contains(got, "=== svc ===") {
+	if !strings.Contains(got, "api") || !strings.Contains(got, "svc") {
 		t.Errorf("output missing repo headers: %q", got)
 	}
 	if strings.Count(got, "hello") != 2 {
@@ -63,7 +63,7 @@ func TestRunSpaceExec_OutputInRepoOrder(t *testing.T) {
 		t.Fatalf("RunSpaceExec: %v", err)
 	}
 	got := out.String()
-	if strings.Index(got, "=== api ===") > strings.Index(got, "=== svc ===") {
+	if strings.Index(got, "api") > strings.Index(got, "svc") {
 		t.Errorf("repos should appear in state order: %q", got)
 	}
 }

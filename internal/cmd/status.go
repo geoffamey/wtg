@@ -144,7 +144,7 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	}
 	_ = g.Wait() // goroutines always return nil; outcomes are written to results[i]
 
-	// Render repo rows into a buffer so tabwriter computes column widths across
+	// Render repo rows into a buffer so column widths are computed across
 	// all repos before we interleave file lines in detailed mode.
 	var buf bytes.Buffer
 	tbl := ui.NewTableWriter(&buf)
@@ -172,7 +172,15 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 				if y == '.' {
 					y = ' '
 				}
-				fmt.Fprintf(out, "    %c%c  %s\n", x, y, f.Path)
+				xStr := ui.Muted.Render(string(x))
+				if x != ' ' && x != '?' {
+					xStr = ui.OK.Render(string(x))
+				}
+				yStr := ui.Muted.Render(string(y))
+				if y != ' ' && y != '?' {
+					yStr = ui.Warn.Render(string(y))
+				}
+				fmt.Fprintf(out, "    %s%s  %s\n", xStr, yStr, f.Path)
 			}
 		}
 	}

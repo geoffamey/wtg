@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/geoffamey/wtg/internal/state"
+	"github.com/geoffamey/wtg/internal/ui"
 )
 
 // ExecCommand returns the `wtg exec` command.
@@ -47,14 +48,20 @@ func RunSpaceExec(spaceName string, args []string, out io.Writer) error {
 	}
 
 	var failed []string
-	for _, r := range sp.Repos {
-		fmt.Fprintf(out, "=== %s ===\n", r.Name)
+	for i, r := range sp.Repos {
+		if i > 0 {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintf(out, "%s\n", ui.SectionHeader(r.Name))
 		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 		cmd.Dir = r.WorktreePath
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Run(); err != nil {
 			failed = append(failed, r.Name)
+			fmt.Fprintf(out, "%s\n", ui.Fail.Render(ui.SymFail+" failed"))
+		} else {
+			fmt.Fprintf(out, "%s\n", ui.OK.Render(ui.SymOK+" ok"))
 		}
 	}
 
