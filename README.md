@@ -12,9 +12,11 @@ go install github.com/geoffamey/wtg@latest
 
 ### Shell completions
 
-**fish:**
+**fish** — add to `~/.config/fish/conf.d/wtg.fish`:
 ```fish
-wtg completion fish > ~/.config/fish/completions/wtg.fish
+if status is-interactive
+    wtg completion fish | source
+end
 ```
 
 **bash** — add to `~/.bashrc`:
