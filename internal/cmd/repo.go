@@ -358,7 +358,10 @@ func repoStatusCols(repoPath string, runner git.Runner, long bool) []string {
 	return cols
 }
 
-// branchCol renders the branch name, highlighted if it differs from the default.
+// branchCol renders the branch name. Detached HEAD is yellow (unexpected git
+// state). A branch that differs from the expected branch is red (likely a
+// mistake). The expected branch is the space's branch for worktrees, or the
+// repo's default branch for main clones.
 func branchCol(branch, defaultBranch string) string {
 	if branch == "" {
 		return ui.Warn.Render("[(detached)]")
@@ -367,7 +370,7 @@ func branchCol(branch, defaultBranch string) string {
 	if defaultBranch == "" || branch == defaultBranch {
 		return ui.Muted.Render(text)
 	}
-	return ui.Warn.Render(text)
+	return ui.Fail.Render(text)
 }
 
 // statusCol renders the working-tree state as a clean/dirty summary.
@@ -386,12 +389,12 @@ func statusCol(files []git.FileStatus) string {
 	return ui.Fail.Render(ui.SymFail + " " + strings.Join(parts, ", "))
 }
 
-// aheadBehindCol renders ahead/behind counts. Returns an empty string if
-// the repo has no upstream tracking branch.
-// Colours: behind > 0 → yellow; both non-zero (diverged) → red.
+// aheadBehindCol renders ahead/behind counts.
+// No upstream → "(local)" muted. In sync → empty. Otherwise shows the
+// non-zero direction(s); diverged (both non-zero) is red, behind-only is yellow.
 func aheadBehindCol(ahead, behind int, hasUpstream bool) string {
 	if !hasUpstream {
-		return ""
+		return ui.Muted.Render("(local)")
 	}
 	a := fmt.Sprintf("%s%d", ui.SymUp, ahead)
 	b := fmt.Sprintf("↓%d", behind)
@@ -399,9 +402,11 @@ func aheadBehindCol(ahead, behind int, hasUpstream bool) string {
 	case ahead > 0 && behind > 0:
 		return ui.Fail.Render(a + " " + b)
 	case behind > 0:
-		return a + " " + ui.Warn.Render(b)
+		return ui.Warn.Render(b)
+	case ahead > 0:
+		return a
 	default:
-		return a + " " + b
+		return ""
 	}
 }
 

@@ -67,7 +67,7 @@ func TestRunStatus_OnSpaceBranch_ShowsMuted(t *testing.T) {
 	}
 }
 
-func TestRunStatus_WrongBranch_ShowsWarn(t *testing.T) {
+func TestRunStatus_WrongBranch_ShowsFail(t *testing.T) {
 	isolateState(t)
 	sp := t.TempDir()
 	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
@@ -77,9 +77,9 @@ func TestRunStatus_WrongBranch_ShowsWarn(t *testing.T) {
 	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
-	want := ui.Warn.Render("[other-branch]")
+	want := ui.Fail.Render("[other-branch]")
 	if !strings.Contains(out.String(), want) {
-		t.Errorf("worktree on wrong branch should be warned: %q", out.String())
+		t.Errorf("worktree on wrong branch should be shown as fail: %q", out.String())
 	}
 }
 

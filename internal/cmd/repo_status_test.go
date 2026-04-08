@@ -31,8 +31,8 @@ func TestBranchCol_DefaultBranch(t *testing.T) {
 
 func TestBranchCol_NonDefault(t *testing.T) {
 	got := branchCol("feature", "main")
-	if got != ui.Warn.Render("[feature]") {
-		t.Errorf("expected warn style for non-default branch: %q", got)
+	if got != ui.Fail.Render("[feature]") {
+		t.Errorf("expected fail style for non-default branch: %q", got)
 	}
 }
 
@@ -99,15 +99,14 @@ func TestStatusCol_Mixed(t *testing.T) {
 // --- aheadBehindCol ---
 
 func TestAheadBehindCol_NoUpstream(t *testing.T) {
-	if got := aheadBehindCol(0, 0, false); got != "" {
-		t.Errorf("expected empty without upstream, got %q", got)
+	if got := aheadBehindCol(0, 0, false); got != ui.Muted.Render("(local)") {
+		t.Errorf("expected (local) without upstream, got %q", got)
 	}
 }
 
 func TestAheadBehindCol_Clean(t *testing.T) {
-	got := aheadBehindCol(0, 0, true)
-	if !strings.Contains(got, "↑0") || !strings.Contains(got, "↓0") {
-		t.Errorf("expected ↑0 ↓0: %q", got)
+	if got := aheadBehindCol(0, 0, true); got != "" {
+		t.Errorf("expected empty for in-sync branch, got %q", got)
 	}
 }
 
