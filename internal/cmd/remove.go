@@ -114,7 +114,7 @@ func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out i
 		for _, w := range warnings {
 			fmt.Fprintf(out, "  %s %s\n", ui.SymWarn, w)
 		}
-		ok, err := confirm(bufio.NewReader(in), out, "Remove anyway?")
+		ok, err := confirm(bufio.NewReader(in), out, "Remove repos anyway?")
 		if err != nil {
 			return err
 		}

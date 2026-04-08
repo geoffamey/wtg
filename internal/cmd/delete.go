@@ -93,7 +93,7 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 		for _, w := range warnings {
 			fmt.Fprintf(out, "  %s %s\n", ui.SymWarn, w)
 		}
-		ok, err := confirm(bufio.NewReader(in), out, "Delete anyway?")
+		ok, err := confirm(bufio.NewReader(in), out, "Delete workspace anyway?")
 		if err != nil {
 			return err
 		}
