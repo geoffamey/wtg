@@ -15,35 +15,29 @@ go install github.com/geoffamey/wtg@latest
 **bash** — add to `~/.bashrc`:
 ```bash
 source <(wtg completion bash)
+wcd() { cd "$(wtg path "$1")"; }
 ```
 
 **zsh** — add to `~/.zshrc`:
 ```zsh
 source <(wtg completion zsh)
+wcd() { cd "$(wtg path "$1")"; }
 ```
 
 **fish** — add to `~/.config/fish/conf.d/wtg.fish`:
 ```fish
 if status is-interactive
     wtg completion fish | source
+    function wcd
+        cd (wtg path $argv[1])
+    end
+    complete -c wcd -f -a '(wtg path --generate-shell-completion 2>/dev/null)'
 end
 ```
 
-### `wcd` — jump into a workspace
-
-Since `cd` must run in the current shell, add a small wrapper function:
-
-**bash / zsh:**
-```bash
-wcd() { cd "$(wtg path "$1")"; }
-```
-
-**fish:**
-```fish
-function wcd
-    cd (wtg path $argv[1])
-end
-```
+`wcd <workspace>` is a shell helper that `cd`s into the workspace root. Since
+`cd` must run in the current shell it can't be a standalone command. The fish
+`complete` line gives `wcd` the same workspace-name tab completion as `wtg path`.
 
 ## Configuration
 
@@ -64,8 +58,12 @@ spaces:
   root_dir: ~/workspaces  # where workspaces are created
 
 git:
-  branch_prefix: ""       # prepended to workspace names, e.g. "geoff/"
+  branch_prefix: ""       # prepended to workspace names, e.g. "yourname/"
 ```
+
+`discovery.root_dir` should contain your regular repo clones, each sitting on
+their default branch (`main`, `master`, etc.) and otherwise left untouched.
+`wtg` creates worktrees alongside them — it never modifies the main clones.
 
 Override with `--config <path>` or the `WTG_CONFIG` environment variable.
 
@@ -93,8 +91,8 @@ discovered repos are included.
 
 ```sh
 wtg new my-feature api payments frontend
-wtg new my-feature                          # include all discovered repos
-wtg new my-feature api --branch geoff/main  # check out an existing branch
+wtg new my-feature                             # include all discovered repos
+wtg new my-feature api --branch yourname/main  # check out an existing branch
 ```
 
 Branch behaviour per repo:
