@@ -12,13 +12,6 @@ go install github.com/geoffamey/wtg@latest
 
 ### Shell completions
 
-**fish** — add to `~/.config/fish/conf.d/wtg.fish`:
-```fish
-if status is-interactive
-    wtg completion fish | source
-end
-```
-
 **bash** — add to `~/.bashrc`:
 ```bash
 source <(wtg completion bash)
@@ -27,6 +20,13 @@ source <(wtg completion bash)
 **zsh** — add to `~/.zshrc`:
 ```zsh
 source <(wtg completion zsh)
+```
+
+**fish** — add to `~/.config/fish/conf.d/wtg.fish`:
+```fish
+if status is-interactive
+    wtg completion fish | source
+end
 ```
 
 ### `wcd` — jump into a workspace
