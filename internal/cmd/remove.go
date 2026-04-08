@@ -20,7 +20,8 @@ import (
 // RemoveCommand returns the `wtg remove` command.
 func RemoveCommand(runner git.Runner) *cli.Command {
 	return &cli.Command{
-		Name:      "remove",
+		Name:    "remove",
+		Aliases: []string{"rm"},
 		Usage:     "remove repos from a workspace",
 		ArgsUsage: "<workspace> <repo>...",
 		Description: `Removes the specified repos' worktrees from a workspace and updates go.work.
