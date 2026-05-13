@@ -9,7 +9,7 @@ require (
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/v2 v2.3.4
-	github.com/urfave/cli/v3 v3.8.0
+	github.com/urfave/cli/v3 v3.9.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/mod v0.34.0
 	golang.org/x/sync v0.20.0
