@@ -99,19 +99,25 @@ func TestStatusCol_Mixed(t *testing.T) {
 // --- aheadBehindCol ---
 
 func TestAheadBehindCol_NoUpstream(t *testing.T) {
-	if got := aheadBehindCol(0, 0, false); got != ui.Muted.Render("(local)") {
+	if got := aheadBehindCol(0, 0, false, false); got != ui.Muted.Render("(local)") {
 		t.Errorf("expected (local) without upstream, got %q", got)
 	}
 }
 
+func TestAheadBehindCol_Merged(t *testing.T) {
+	if got := aheadBehindCol(0, 0, false, true); got != ui.Muted.Render("(merged)") {
+		t.Errorf("expected (merged), got %q", got)
+	}
+}
+
 func TestAheadBehindCol_Clean(t *testing.T) {
-	if got := aheadBehindCol(0, 0, true); got != "" {
+	if got := aheadBehindCol(0, 0, true, false); got != "" {
 		t.Errorf("expected empty for in-sync branch, got %q", got)
 	}
 }
 
 func TestAheadBehindCol_Behind(t *testing.T) {
-	got := aheadBehindCol(0, 3, true)
+	got := aheadBehindCol(0, 3, true, false)
 	// ↓3 should be warn-coloured
 	if !strings.Contains(got, ui.Warn.Render("↓3")) {
 		t.Errorf("expected warn-coloured ↓3: %q", got)
@@ -119,10 +125,44 @@ func TestAheadBehindCol_Behind(t *testing.T) {
 }
 
 func TestAheadBehindCol_Diverged(t *testing.T) {
-	got := aheadBehindCol(2, 3, true)
+	got := aheadBehindCol(2, 3, true, false)
 	// Both should be fail-coloured
 	if !strings.Contains(got, ui.Fail.Render("↑2 ↓3")) {
 		t.Errorf("expected fail-coloured diverged: %q", got)
+	}
+}
+
+// --- isMergedIntoRemote ---
+
+func TestIsMergedIntoRemote_RemoteGone(t *testing.T) {
+	// Remote ref absent → merged.
+	r := &testRunner{
+		remoteBranchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+	}
+	if !isMergedIntoRemote(r, "/repo", "feat") {
+		t.Error("expected merged=true when remote ref is gone")
+	}
+}
+
+func TestIsMergedIntoRemote_RemoteExistsAndMerged(t *testing.T) {
+	// Remote ref present and is ancestor of HEAD → merged.
+	r := &testRunner{
+		remoteBranchExistsFn: func(_, _ string) (bool, error) { return true, nil },
+		branchMergedFn:       func(_, _ string) (bool, error) { return true, nil },
+	}
+	if !isMergedIntoRemote(r, "/repo", "feat") {
+		t.Error("expected merged=true when remote ref is ancestor of HEAD")
+	}
+}
+
+func TestIsMergedIntoRemote_RemoteExistsNotMerged(t *testing.T) {
+	// Remote ref present but not yet merged.
+	r := &testRunner{
+		remoteBranchExistsFn: func(_, _ string) (bool, error) { return true, nil },
+		branchMergedFn:       func(_, _ string) (bool, error) { return false, nil },
+	}
+	if isMergedIntoRemote(r, "/repo", "feat") {
+		t.Error("expected merged=false when remote ref exists and is not ancestor")
 	}
 }
 

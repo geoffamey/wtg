@@ -126,9 +126,10 @@ func spaceContainingCWD(spaces []*state.Space) *state.Space {
 
 // repoStatusResult holds the git status (or error) for one worktree.
 type repoStatusResult struct {
-	entry state.RepoEntry
-	st    git.RepoStatus
-	err   error
+	entry  state.RepoEntry
+	st     git.RepoStatus
+	err    error
+	merged bool
 }
 
 // printSpaceDetail prints the space header followed by a per-repo status table.
@@ -144,7 +145,11 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	for i, r := range sp.Repos {
 		g.Go(func() error {
 			st, err := runner.Status(r.WorktreePath)
-			results[i] = repoStatusResult{entry: r, st: st, err: err}
+			merged := false
+			if err == nil && st.Upstream == "" && st.Branch != "" {
+				merged = isMergedIntoRemote(runner, r.RepoPath, sp.Branch)
+			}
+			results[i] = repoStatusResult{entry: r, st: st, err: err, merged: merged}
 			return nil
 		})
 	}
@@ -155,7 +160,7 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	var buf bytes.Buffer
 	tbl := ui.NewTableWriter(&buf)
 	for _, rs := range results {
-		tbl.Row(append([]string{"  " + rs.entry.Name}, worktreeStatusCols(rs.st, rs.err, sp.Branch)...)...)
+		tbl.Row(append([]string{"  " + rs.entry.Name}, worktreeStatusCols(rs.st, rs.err, sp.Branch, rs.merged)...)...)
 	}
 	tbl.Flush()
 
@@ -195,13 +200,13 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 
 // worktreeStatusCols returns the branch, status, and ahead/behind columns for
 // one worktree row. The expected branch is the space's branch.
-func worktreeStatusCols(st git.RepoStatus, err error, spaceBranch string) []string {
+func worktreeStatusCols(st git.RepoStatus, err error, spaceBranch string, merged bool) []string {
 	if err != nil {
 		return []string{ui.Fail.Render(ui.SymFail + " " + err.Error())}
 	}
 	return []string{
 		branchCol(st.Branch, spaceBranch),
 		statusCol(st.Files),
-		aheadBehindCol(st.Ahead, st.Behind, st.Upstream != ""),
+		aheadBehindCol(st.Ahead, st.Behind, st.Upstream != "", merged),
 	}
 }

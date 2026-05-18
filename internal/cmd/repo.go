@@ -344,10 +344,16 @@ func repoStatusCols(repoPath string, runner git.Runner, long bool) []string {
 
 	defaultBranch, _ := runner.DefaultBranch(repoPath) // empty if no remote
 
+	hasUpstream := st.Upstream != ""
+	merged := false
+	if !hasUpstream && st.Branch != "" {
+		merged = isMergedIntoRemote(runner, repoPath, st.Branch)
+	}
+
 	cols := []string{
 		branchCol(st.Branch, defaultBranch),
 		statusCol(st.Files),
-		aheadBehindCol(st.Ahead, st.Behind, st.Upstream != ""),
+		aheadBehindCol(st.Ahead, st.Behind, hasUpstream, merged),
 	}
 
 	if long {
@@ -389,10 +395,30 @@ func statusCol(files []git.FileStatus) string {
 	return ui.Fail.Render(ui.SymFail + " " + strings.Join(parts, ", "))
 }
 
+// isMergedIntoRemote reports whether branch has been merged into the remote
+// default branch, using only local refs (accurate after a fetch). It returns
+// true when the remote branch ref is gone (deleted after merge) OR when the
+// remote branch tip is an ancestor of the remote default branch.
+func isMergedIntoRemote(runner git.Runner, repoPath, branch string) bool {
+	remoteExists, err := runner.RemoteBranchExists(repoPath, branch)
+	if err != nil || !remoteExists {
+		return !remoteExists // remote ref gone → treat as merged
+	}
+	merged, err := runner.BranchMerged(repoPath, "refs/remotes/origin/"+branch)
+	if err != nil {
+		return false
+	}
+	return merged
+}
+
 // aheadBehindCol renders ahead/behind counts.
-// No upstream → "(local)" muted. In sync → empty. Otherwise shows the
-// non-zero direction(s); diverged (both non-zero) is red, behind-only is yellow.
-func aheadBehindCol(ahead, behind int, hasUpstream bool) string {
+// Merged → "(merged)" muted. No upstream → "(local)" muted. In sync → empty.
+// Otherwise shows the non-zero direction(s); diverged (both non-zero) is red,
+// behind-only is yellow.
+func aheadBehindCol(ahead, behind int, hasUpstream, merged bool) string {
+	if merged {
+		return ui.Muted.Render("(merged)")
+	}
 	if !hasUpstream {
 		return ui.Muted.Render("(local)")
 	}

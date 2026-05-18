@@ -218,6 +218,27 @@ func TestRunStatus_NoArg_InsideSpace_ShowsDetail(t *testing.T) {
 	}
 }
 
+// --- merged branch detection ---
+
+func TestRunStatus_MergedBranch_ShowsMerged(t *testing.T) {
+	isolateState(t)
+	sp := t.TempDir()
+	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
+
+	r := &testRunner{
+		// No upstream → triggers merged check.
+		statusFn:             alwaysStatus(git.RepoStatus{Branch: "geoff/feat"}),
+		remoteBranchExistsFn: func(_, _ string) (bool, error) { return false, nil }, // remote gone
+	}
+	var out bytes.Buffer
+	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {
+		t.Fatalf("RunStatus: %v", err)
+	}
+	if !strings.Contains(out.String(), ui.Muted.Render("(merged)")) {
+		t.Errorf("merged branch should show (merged): %q", out.String())
+	}
+}
+
 // --- --detailed flag ---
 
 func TestRunStatus_Detailed_ShowsFiles(t *testing.T) {
