@@ -4,3 +4,10 @@ updates:
     directory: /
     schedule:
       interval: daily
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      go-deps:
+        patterns:
+          - "*"
