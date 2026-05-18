@@ -3,4 +3,11 @@ updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: daily
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      go-deps:
+        patterns:
+          - "*"
