@@ -345,7 +345,10 @@ func repoStatusCols(repoPath string, runner git.Runner, long bool) []string {
 	defaultBranch, _ := runner.DefaultBranch(repoPath) // empty if no remote
 
 	hasUpstream := st.Upstream != ""
-	merged := st.Branch != "" && isMergedIntoRemote(runner, repoPath, st.Branch)
+	merged, err := runner.BranchMerged(repoPath, st.Branch)
+	if err != nil {
+		merged = false
+	}
 
 	cols := []string{
 		branchCol(st.Branch, defaultBranch),
@@ -390,18 +393,6 @@ func statusCol(files []git.FileStatus) string {
 		parts = append(parts, fmt.Sprintf("%d untracked", untracked))
 	}
 	return ui.Fail.Render(ui.SymFail + " " + strings.Join(parts, ", "))
-}
-
-// isMergedIntoRemote reports whether branch has been merged into the default
-// branch, using only local refs (accurate after a fetch). It checks whether
-// the local branch tip is an ancestor of HEAD on the main clone, which is on
-// the default branch. Squash merges are not detectable this way.
-func isMergedIntoRemote(runner git.Runner, repoPath, branch string) bool {
-	merged, err := runner.BranchMerged(repoPath, branch)
-	if err != nil {
-		return false
-	}
-	return merged
 }
 
 // aheadBehindCol renders ahead/behind counts.

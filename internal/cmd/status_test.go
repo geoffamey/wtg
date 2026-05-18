@@ -226,7 +226,6 @@ func TestRunStatus_MergedBranch_ShowsMerged(t *testing.T) {
 	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{
-		// No upstream → triggers merged check; local branch is ancestor of HEAD.
 		statusFn:       alwaysStatus(git.RepoStatus{Branch: "geoff/feat"}),
 		branchMergedFn: func(_, _ string) (bool, error) { return true, nil },
 	}
