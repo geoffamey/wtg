@@ -29,9 +29,8 @@ func NewCommand(runner git.Runner) *cli.Command {
 repo, all on the same branch. A go.work file is written automatically when
 any of the included repos have a go.mod.
 
-If no repos are specified, all repos discovered under discovery.root_dir
-are included. If the branch already exists in a repo it is checked out
-as-is — no reset or rebase is performed.`,
+At least one repo must be specified. If the branch already exists in a repo
+it is checked out as-is — no reset or rebase is performed.`,
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -50,6 +49,9 @@ as-is — no reset or rebase is performed.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() == 0 {
 				return fmt.Errorf("missing required argument: <workspace>")
+			}
+			if cmd.Args().Len() < 2 {
+				return fmt.Errorf("at least one repo is required; use 'wtg repo status' to see available repos")
 			}
 			cfg, err := config.Load(cmd.Root().String("config"))
 			if err != nil {
@@ -72,7 +74,7 @@ type SpaceNewArgs struct {
 	Branch string   // overrides cfg.Git.BranchPrefix+Name when set
 	Path   string   // overrides cfg.Spaces.RootDir/Name when set
 	Base   string   // commit-ish to branch from (default: HEAD)
-	Repos  []string // short names; empty = all discovered repos
+	Repos  []string // short names; at least one required
 }
 
 // RunSpaceNew creates a new workspace, checking out a worktree in each
@@ -120,18 +122,8 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 
 	hasGoMod, anyGoMod := detectGoMods(targets)
 
-	var steps []saga.Step
-	for i := range targets {
-		steps = append(steps, worktreeStep(runner, targets[i], branch, args.Base))
-	}
-	goWorkPath := filepath.Join(spacePath, "go.work")
-	if anyGoMod {
-		goVersion := detectGoVersion(targets, hasGoMod)
-		steps = append(steps, goWorkStep(goWorkPath, spacePath, targets, hasGoMod, goVersion))
-	}
-
 	savedState := false
-	steps = append(steps, saga.Step{
+	steps := []saga.Step{{
 		Name: "save state",
 		Do: func(ctx context.Context) error {
 			sp := buildSpaceState(args.Name, spacePath, branch, anyGoMod, targets)
@@ -147,7 +139,15 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 			}
 			return nil
 		},
-	})
+	}}
+	for i := range targets {
+		steps = append(steps, worktreeStep(runner, targets[i], branch, args.Base))
+	}
+	goWorkPath := filepath.Join(spacePath, "go.work")
+	if anyGoMod {
+		goVersion := detectGoVersion(targets, hasGoMod)
+		steps = append(steps, goWorkStep(goWorkPath, spacePath, targets, hasGoMod, goVersion))
+	}
 
 	if err := saga.Run(context.Background(), steps); err != nil {
 		return err

@@ -82,16 +82,15 @@ wtg delete my-feature --delete-branch
 
 ## Workspace commands
 
-### `wtg new <workspace> [<repo>...]`
+### `wtg new <workspace> <repo>...`
 
-Create a workspace. For each repo, `wtg` creates or checks out a branch named
-`<branch_prefix><workspace>` as a linked worktree. A `go.work` file is written
-automatically for repos that have a `go.mod`. If no repos are specified, all
-discovered repos are included.
+Create a workspace. At least one repo must be specified. For each repo, `wtg`
+creates or checks out a branch named `<branch_prefix><workspace>` as a linked
+worktree. A `go.work` file is written automatically for repos that have a
+`go.mod`.
 
 ```sh
 wtg new my-feature api payments frontend
-wtg new my-feature                             # include all discovered repos
 wtg new my-feature api --branch yourname/main  # check out an existing branch
 ```
 
