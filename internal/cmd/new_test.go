@@ -211,6 +211,36 @@ func TestRunSpaceNew_ExistingBranchNotCheckedOut(t *testing.T) {
 	}
 }
 
+func TestRunSpaceNew_RemoteOnlyBranch(t *testing.T) {
+	// Branch exists on remote but not locally — should create a local branch from the remote ref.
+	root := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	cfg := spaceCreateCfg(root, t.TempDir())
+
+	var gotBase string
+	var gotCreate bool
+	r := &testRunner{
+		branchExistsFn:       func(_, _ string) (bool, error) { return false, nil },
+		remoteBranchExistsFn: func(_, _ string) (bool, error) { return true, nil },
+		worktreeAddFn: func(_, _, _, base string, create bool) error {
+			gotBase = base
+			gotCreate = create
+			return nil
+		},
+	}
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Branch: "feat"}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+	if !gotCreate {
+		t.Error("should create local branch when only remote exists")
+	}
+	if gotBase != "origin/feat" {
+		t.Errorf("base: got %q, want %q", gotBase, "origin/feat")
+	}
+}
+
 // --- happy path ---
 
 func TestRunSpaceNew_Success(t *testing.T) {

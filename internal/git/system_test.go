@@ -185,6 +185,65 @@ func TestBranchExists(t *testing.T) {
 	}
 }
 
+func TestRemoteBranchExists(t *testing.T) {
+	t.Parallel()
+	local, remote := testhelper.InitWithRemote(t)
+	r := runner()
+
+	// Push a branch to the remote, but keep it remote-only in local.
+	local.GitCmd("push", "origin", "main:refs/heads/remote-only")
+
+	exists, err := r.RemoteBranchExists(local.Path, "remote-only")
+	if err != nil {
+		t.Fatalf("RemoteBranchExists(remote-only): %v", err)
+	}
+	if !exists {
+		t.Error("remote-only branch should be detected as existing on remote")
+	}
+
+	// Local branch for it should not exist.
+	localExists, err := r.BranchExists(local.Path, "remote-only")
+	if err != nil {
+		t.Fatalf("BranchExists(remote-only): %v", err)
+	}
+	if localExists {
+		t.Error("remote-only branch should not appear as a local branch")
+	}
+
+	// Non-existent branch.
+	exists, err = r.RemoteBranchExists(local.Path, "no-such-branch")
+	if err != nil {
+		t.Fatalf("RemoteBranchExists(no-such-branch): %v", err)
+	}
+	if exists {
+		t.Error("no-such-branch should not exist on remote")
+	}
+
+	_ = remote
+}
+
+func TestPush_SetsUpstream(t *testing.T) {
+	t.Parallel()
+	local, _ := testhelper.InitWithRemote(t)
+	r := runner()
+
+	local.GitCmd("checkout", "-b", "my-feature")
+	local.Commit("feature commit")
+
+	if err := r.Push(local.Path, "my-feature"); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+
+	// After push with --set-upstream, git status should report an upstream.
+	s, err := r.Status(local.Path)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if s.Upstream == "" {
+		t.Error("upstream should be set after Push")
+	}
+}
+
 func TestBranchDelete(t *testing.T) {
 	t.Parallel()
 	repo := testhelper.Init(t)
