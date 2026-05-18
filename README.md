@@ -134,8 +134,8 @@ wtg remove my-feature logging -d  # also delete the branch
 
 ### `wtg status [<workspace>]`
 
-Show workspace status. Without arguments, shows all workspaces — or just the
-current one if you're inside a workspace directory. Pass `--long` / `-l` to
+Show workspace status. Without arguments, shows all workspaces — the one
+containing the current directory is listed first. Pass `--long` / `-l` to
 expand file-level changes per repo.
 
 ```sh

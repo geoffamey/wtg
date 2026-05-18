@@ -197,16 +197,24 @@ func TestRunStatus_NoArg_InsideSpace_ShowsDetail(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	makeSpace(t, "feat", "geoff/feat", dir, []string{"api"}, "/repos")
+	makeSpace(t, "other", "other", t.TempDir(), []string{"svc"}, "/repos")
 
 	r := &testRunner{statusFn: alwaysStatus(git.RepoStatus{Branch: "geoff/feat"})}
 	var out bytes.Buffer
 	if err := RunSpaceStatus(r, nil, false, &out); err != nil {
 		t.Fatalf("RunStatus: %v", err)
 	}
-	// Detail view runs git and shows per-repo branch column.
-	want := ui.Muted.Render("[geoff/feat]")
-	if !strings.Contains(out.String(), want) {
-		t.Errorf("detail view should show per-repo branch column: %q", out.String())
+	got := out.String()
+	// Both spaces should be shown.
+	if !strings.Contains(got, "feat") {
+		t.Errorf("current space should be shown: %q", got)
+	}
+	if !strings.Contains(got, "other") {
+		t.Errorf("other space should also be shown: %q", got)
+	}
+	// Current space (CWD inside it) should appear before the other.
+	if strings.Index(got, "feat") > strings.Index(got, "other") {
+		t.Errorf("current space should appear before other spaces:\n%s", got)
 	}
 }
 

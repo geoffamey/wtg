@@ -26,8 +26,8 @@ func StatusCommand(runner git.Runner) *cli.Command {
 		Usage:     "show status of repos and workspaces",
 		ArgsUsage: "[<workspace>]",
 		Description: `Without arguments, shows a combined view: main repo clone status at the top,
-then per-repo status for every workspace. If the current directory is inside
-a known workspace, only that workspace is shown in detail.
+then per-repo status for every workspace. The workspace containing the current
+directory is shown first.
 
 Pass one or more workspace names to show those workspaces explicitly.
 Use --long (-l) to expand each dirty repo with its individual file changes.`,
@@ -60,11 +60,10 @@ Use --long (-l) to expand each dirty repo with its individual file changes.`,
 	}
 }
 
-// RunSpaceStatus shows workspace status. With no arguments it detects whether
-// the current directory is inside a known space and shows that space in detail;
-// if not, it prints per-repo detail for every space. With named spaces it shows
-// full per-repo detail for each. The --detailed flag adds individual
-// modified-file listings under each repo row.
+// RunSpaceStatus shows workspace status. With no arguments it prints per-repo
+// detail for every space; the space containing the current directory is shown
+// first. With named spaces it shows full per-repo detail for each. The
+// --detailed flag adds individual modified-file listings under each repo row.
 func RunSpaceStatus(runner git.Runner, names []string, detailed bool, out io.Writer) error {
 	if len(names) == 0 {
 		spaces, err := state.List()
@@ -73,9 +72,16 @@ func RunSpaceStatus(runner git.Runner, names []string, detailed bool, out io.Wri
 		}
 		sort.Slice(spaces, func(i, j int) bool { return spaces[i].Name < spaces[j].Name })
 
-		if sp := spaceContainingCWD(spaces); sp != nil {
-			return printSpaceDetail(runner, sp, detailed, out)
+		// If CWD is inside a known space, sort that space to the front.
+		if current := spaceContainingCWD(spaces); current != nil {
+			for i, sp := range spaces {
+				if sp.Name == current.Name {
+					spaces = append([]*state.Space{sp}, append(spaces[:i:i], spaces[i+1:]...)...)
+					break
+				}
+			}
 		}
+
 		for i, sp := range spaces {
 			if i > 0 {
 				fmt.Fprintln(out)
