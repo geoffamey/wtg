@@ -78,7 +78,7 @@ func (r *testRunner) BranchDelete(repoPath, branch string, force bool) error {
 
 func (r *testRunner) BranchMerged(repoPath, branch string) (bool, error) {
 	if r.branchMergedFn == nil {
-		panic(fmt.Sprintf("unexpected BranchMerged(%q, %q)", repoPath, branch))
+		return false, nil
 	}
 	return r.branchMergedFn(repoPath, branch)
 }

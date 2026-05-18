@@ -134,35 +134,33 @@ func TestAheadBehindCol_Diverged(t *testing.T) {
 
 // --- isMergedIntoRemote ---
 
-func TestIsMergedIntoRemote_RemoteGone(t *testing.T) {
-	// Remote ref absent → merged.
+func TestIsMergedIntoRemote_Merged(t *testing.T) {
+	// Local branch tip is ancestor of HEAD (default branch) → merged.
 	r := &testRunner{
-		remoteBranchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		branchMergedFn: func(_, _ string) (bool, error) { return true, nil },
 	}
 	if !isMergedIntoRemote(r, "/repo", "feat") {
-		t.Error("expected merged=true when remote ref is gone")
+		t.Error("expected merged=true when local branch is ancestor of HEAD")
 	}
 }
 
-func TestIsMergedIntoRemote_RemoteExistsAndMerged(t *testing.T) {
-	// Remote ref present and is ancestor of HEAD → merged.
+func TestIsMergedIntoRemote_NotMerged(t *testing.T) {
+	// Local branch tip is not an ancestor of HEAD → not merged.
 	r := &testRunner{
-		remoteBranchExistsFn: func(_, _ string) (bool, error) { return true, nil },
-		branchMergedFn:       func(_, _ string) (bool, error) { return true, nil },
-	}
-	if !isMergedIntoRemote(r, "/repo", "feat") {
-		t.Error("expected merged=true when remote ref is ancestor of HEAD")
-	}
-}
-
-func TestIsMergedIntoRemote_RemoteExistsNotMerged(t *testing.T) {
-	// Remote ref present but not yet merged.
-	r := &testRunner{
-		remoteBranchExistsFn: func(_, _ string) (bool, error) { return true, nil },
-		branchMergedFn:       func(_, _ string) (bool, error) { return false, nil },
+		branchMergedFn: func(_, _ string) (bool, error) { return false, nil },
 	}
 	if isMergedIntoRemote(r, "/repo", "feat") {
-		t.Error("expected merged=false when remote ref exists and is not ancestor")
+		t.Error("expected merged=false when local branch is not ancestor of HEAD")
+	}
+}
+
+func TestIsMergedIntoRemote_NeverPushed(t *testing.T) {
+	// Branch never pushed — no remote ref, local commits not in default branch.
+	r := &testRunner{
+		branchMergedFn: func(_, _ string) (bool, error) { return false, nil },
+	}
+	if isMergedIntoRemote(r, "/repo", "feat") {
+		t.Error("expected merged=false for a branch that was never pushed")
 	}
 }
 

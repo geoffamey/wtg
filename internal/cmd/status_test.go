@@ -226,9 +226,9 @@ func TestRunStatus_MergedBranch_ShowsMerged(t *testing.T) {
 	makeSpace(t, "feat", "geoff/feat", sp, []string{"api"}, "/repos")
 
 	r := &testRunner{
-		// No upstream → triggers merged check.
-		statusFn:             alwaysStatus(git.RepoStatus{Branch: "geoff/feat"}),
-		remoteBranchExistsFn: func(_, _ string) (bool, error) { return false, nil }, // remote gone
+		// No upstream → triggers merged check; local branch is ancestor of HEAD.
+		statusFn:       alwaysStatus(git.RepoStatus{Branch: "geoff/feat"}),
+		branchMergedFn: func(_, _ string) (bool, error) { return true, nil },
 	}
 	var out bytes.Buffer
 	if err := RunSpaceStatus(r, []string{"feat"}, false, &out); err != nil {

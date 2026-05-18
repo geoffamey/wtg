@@ -145,10 +145,7 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	for i, r := range sp.Repos {
 		g.Go(func() error {
 			st, err := runner.Status(r.WorktreePath)
-			merged := false
-			if err == nil && st.Upstream == "" && st.Branch != "" {
-				merged = isMergedIntoRemote(runner, r.RepoPath, sp.Branch)
-			}
+			merged := err == nil && isMergedIntoRemote(runner, r.RepoPath, sp.Branch)
 			results[i] = repoStatusResult{entry: r, st: st, err: err, merged: merged}
 			return nil
 		})
