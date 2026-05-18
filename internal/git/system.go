@@ -117,6 +117,17 @@ func (r *SystemRunner) BranchExists(repoPath, branch string) (bool, error) {
 	return true, nil
 }
 
+func (r *SystemRunner) RemoteBranchExists(repoPath, branch string) (bool, error) {
+	_, err := r.run(repoPath, "rev-parse", "--verify", "refs/remotes/origin/"+branch)
+	if err != nil {
+		if exitCode(err) == 128 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (r *SystemRunner) BranchDelete(repoPath, branch string, force bool) error {
 	flag := "-d"
 	if force {
@@ -173,7 +184,7 @@ func (r *SystemRunner) FastForward(repoPath, branch string) error {
 }
 
 func (r *SystemRunner) Push(repoPath, branch string) error {
-	_, err := r.run(repoPath, "push", "origin", branch)
+	_, err := r.run(repoPath, "push", "--set-upstream", "origin", branch)
 	return err
 }
 

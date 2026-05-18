@@ -44,6 +44,7 @@ type Runner interface {
 
 	// Branches
 	BranchExists(repoPath, branch string) (bool, error)
+	RemoteBranchExists(repoPath, branch string) (bool, error)
 	BranchDelete(repoPath, branch string, force bool) error
 	BranchMerged(repoPath, branch string) (bool, error) // is branch merged into HEAD?
 

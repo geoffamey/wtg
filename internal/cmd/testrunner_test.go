@@ -10,20 +10,21 @@ import (
 // Only set the function fields your test actually needs; unset fields panic
 // with a descriptive message if called unexpectedly.
 type testRunner struct {
-	worktreeAddFn    func(repoPath, worktreePath, branch, base string, createBranch bool) error
-	worktreeRemoveFn func(repoPath, worktreePath string, force bool) error
-	worktreeListFn   func(repoPath string) ([]git.WorktreeInfo, error)
-	worktreeRepairFn func(repoPath string, paths ...string) error
-	branchExistsFn   func(repoPath, branch string) (bool, error)
-	branchDeleteFn   func(repoPath, branch string, force bool) error
-	branchMergedFn   func(repoPath, branch string) (bool, error)
-	statusFn         func(repoPath string) (git.RepoStatus, error)
-	defaultBranchFn  func(repoPath string) (string, error)
-	fetchFn          func(repoPath string) error
-	fastForwardFn    func(repoPath, branch string) error
-	pushFn           func(repoPath, branch string) error
-	rebaseFn         func(repoPath, onto string) error
-	remoteURLFn      func(repoPath, remote string) (string, error)
+	worktreeAddFn          func(repoPath, worktreePath, branch, base string, createBranch bool) error
+	worktreeRemoveFn       func(repoPath, worktreePath string, force bool) error
+	worktreeListFn         func(repoPath string) ([]git.WorktreeInfo, error)
+	worktreeRepairFn       func(repoPath string, paths ...string) error
+	branchExistsFn         func(repoPath, branch string) (bool, error)
+	remoteBranchExistsFn   func(repoPath, branch string) (bool, error)
+	branchDeleteFn         func(repoPath, branch string, force bool) error
+	branchMergedFn         func(repoPath, branch string) (bool, error)
+	statusFn               func(repoPath string) (git.RepoStatus, error)
+	defaultBranchFn        func(repoPath string) (string, error)
+	fetchFn                func(repoPath string) error
+	fastForwardFn          func(repoPath, branch string) error
+	pushFn                 func(repoPath, branch string) error
+	rebaseFn               func(repoPath, onto string) error
+	remoteURLFn            func(repoPath, remote string) (string, error)
 }
 
 func (r *testRunner) WorktreeAdd(repoPath, worktreePath, branch, base string, createBranch bool) error {
@@ -59,6 +60,13 @@ func (r *testRunner) BranchExists(repoPath, branch string) (bool, error) {
 		panic(fmt.Sprintf("unexpected BranchExists(%q, %q)", repoPath, branch))
 	}
 	return r.branchExistsFn(repoPath, branch)
+}
+
+func (r *testRunner) RemoteBranchExists(repoPath, branch string) (bool, error) {
+	if r.remoteBranchExistsFn == nil {
+		return false, nil
+	}
+	return r.remoteBranchExistsFn(repoPath, branch)
 }
 
 func (r *testRunner) BranchDelete(repoPath, branch string, force bool) error {

@@ -25,6 +25,7 @@ type repoTarget struct {
 	repoPath     string // absolute path to the main clone
 	worktreePath string // absolute path for the new worktree
 	createBranch bool   // whether to create a new branch (set during pre-flight)
+	remoteBase   string // set when branch exists only on remote; used as start point for WorktreeAdd
 }
 
 // targetsFromState converts existing state repo entries back into repoTargets.
@@ -99,7 +100,18 @@ func classifyBranchTargets(runner git.Runner, targets []*repoTarget, branch stri
 			}
 			t.createBranch = false
 		} else {
-			t.createBranch = true
+			remoteExists, err := runner.RemoteBranchExists(t.repoPath, branch)
+			if err != nil {
+				return fmt.Errorf("check remote branch in %s: %w", t.name, err)
+			}
+			if remoteExists {
+				// Branch exists on the remote but not locally — create a local
+				// branch from the remote ref so upstream tracking is configured.
+				t.createBranch = true
+				t.remoteBase = "origin/" + branch
+			} else {
+				t.createBranch = true
+			}
 		}
 	}
 	return nil
@@ -178,7 +190,11 @@ func worktreeStep(runner git.Runner, t *repoTarget, branch, base string) saga.St
 			if err := os.MkdirAll(parentDir, 0o755); err != nil {
 				return fmt.Errorf("create parent dir: %w", err)
 			}
-			if err := runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, base, t.createBranch); err != nil {
+			effectiveBase := base
+			if t.remoteBase != "" {
+				effectiveBase = t.remoteBase
+			}
+			if err := runner.WorktreeAdd(t.repoPath, t.worktreePath, branch, effectiveBase, t.createBranch); err != nil {
 				// Clean up the dir we just created; ignore error (may not be empty
 				// if another worktree in the same space already populated it).
 				_ = os.Remove(parentDir)
