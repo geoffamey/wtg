@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/urfave/cli/v3"
 
 	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
@@ -32,6 +35,36 @@ func createRunner() *testRunner {
 	return &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
 		worktreeAddFn:  func(_, _, _, _ string, _ bool) error { return nil },
+	}
+}
+
+// newApp wraps NewCommand in a minimal parent app so Action can call cmd.Root().
+func newApp(runner git.Runner) *cli.Command {
+	return &cli.Command{
+		Name: "wtg",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "config"},
+		},
+		Commands: []*cli.Command{NewCommand(runner)},
+	}
+}
+
+// --- CLI action validation ---
+
+func TestNewCommand_NoRepoArg(t *testing.T) {
+	err := newApp(&testRunner{}).Run(context.Background(), []string{"wtg", "new", "feat"})
+	if err == nil {
+		t.Fatal("expected error when no repo argument given")
+	}
+	if !strings.Contains(err.Error(), "at least one repo") {
+		t.Errorf("error should mention repo requirement: %v", err)
+	}
+}
+
+func TestNewCommand_NoSpaceArg(t *testing.T) {
+	err := newApp(&testRunner{}).Run(context.Background(), []string{"wtg", "new"})
+	if err == nil {
+		t.Fatal("expected error when no space argument given")
 	}
 }
 
