@@ -174,7 +174,7 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 		tbl.Row("  "+t.name, t.worktreePath)
 	}
 	for _, t := range symlinkTargets {
-		tbl.Row("  "+t.name+" "+ui.Muted.Render(ui.SymLink), ui.Muted.Render(t.repoPath))
+		tbl.Row("  "+t.name, ui.Muted.Render(ui.SymLink+" "+t.repoPath))
 	}
 	tbl.Flush()
 	return nil

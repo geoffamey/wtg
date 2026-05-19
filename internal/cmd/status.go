@@ -161,8 +161,9 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	for _, rs := range results {
 		if rs.entry.Symlink {
 			tbl.Row(
-				"  "+rs.entry.Name+" "+ui.Muted.Render(ui.SymLink),
+				"  "+rs.entry.Name,
 				ui.Muted.Render(rs.entry.RepoPath),
+				ui.Muted.Render(ui.SymLink+" symlink"),
 			)
 			continue
 		}
