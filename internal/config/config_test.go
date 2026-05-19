@@ -155,6 +155,42 @@ func TestLoad_UsesDefaultPath(t *testing.T) {
 	}
 }
 
+func TestLoad_AlwaysSection(t *testing.T) {
+	path := writeConfig(t, `
+always:
+  repos: [docs, shared]
+  files: [~/.config/wtg/CLAUDE.md]
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Always.Repos) != 2 || cfg.Always.Repos[0] != "docs" || cfg.Always.Repos[1] != "shared" {
+		t.Errorf("Always.Repos: got %v", cfg.Always.Repos)
+	}
+	if len(cfg.Always.Files) != 1 {
+		t.Fatalf("Always.Files: got %v", cfg.Always.Files)
+	}
+	home, _ := os.UserHomeDir()
+	wantFile := filepath.Join(home, ".config/wtg/CLAUDE.md")
+	if cfg.Always.Files[0] != wantFile {
+		t.Errorf("Always.Files[0]: got %q, want %q", cfg.Always.Files[0], wantFile)
+	}
+}
+
+func TestLoad_AlwaysEmpty_ByDefault(t *testing.T) {
+	cfg, err := Load(nonexistentPath(t))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Always.Repos) != 0 {
+		t.Errorf("Always.Repos should be empty by default, got %v", cfg.Always.Repos)
+	}
+	if len(cfg.Always.Files) != 0 {
+		t.Errorf("Always.Files should be empty by default, got %v", cfg.Always.Files)
+	}
+}
+
 // writeConfig writes YAML content to a temp file and returns its path.
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()

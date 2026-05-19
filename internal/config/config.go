@@ -19,6 +19,13 @@ type Config struct {
 	Discovery DiscoveryConfig `koanf:"discovery" yaml:"discovery"`
 	Spaces    SpacesConfig    `koanf:"spaces"    yaml:"spaces"`
 	Git       GitConfig       `koanf:"git"       yaml:"git"`
+	Always    AlwaysConfig    `koanf:"always"    yaml:"always"`
+}
+
+// AlwaysConfig lists repos and files that are automatically included in every new space.
+type AlwaysConfig struct {
+	Repos []string `koanf:"repos" yaml:"repos"` // symlinked into every new space
+	Files []string `koanf:"files" yaml:"files"` // copied into every new space root
 }
 
 // DiscoveryConfig controls repo scanning.
@@ -96,6 +103,9 @@ func Load(path string) (*Config, error) {
 
 	cfg.Discovery.RootDir = expandTilde(cfg.Discovery.RootDir)
 	cfg.Spaces.RootDir = expandTilde(cfg.Spaces.RootDir)
+	for i, f := range cfg.Always.Files {
+		cfg.Always.Files[i] = expandTilde(f)
+	}
 
 	return &cfg, nil
 }

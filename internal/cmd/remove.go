@@ -12,6 +12,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/state"
 	"github.com/geoffamey/wtg/internal/ui"
@@ -47,7 +48,11 @@ commits. To remove all repos at once, use wtg delete instead.`,
 			if cmd.Args().Len() < 2 {
 				return fmt.Errorf("usage: wtg remove <workspace> <repo>...") //nolint:staticcheck // It's ok that this ends with punctuation
 			}
-			return RunSpaceRemove(runner, SpaceRemoveArgs{
+			cfg, err := config.Load(cmd.Root().String("config"))
+			if err != nil {
+				return err
+			}
+			return RunSpaceRemove(cfg, runner, SpaceRemoveArgs{
 				Name:         cmd.Args().First(),
 				Repos:        cmd.Args().Tail(),
 				DeleteBranch: cmd.Bool("delete-branch"),
@@ -69,7 +74,13 @@ type SpaceRemoveArgs struct {
 // worktrees and updating the go.work file and state. It mirrors the safety
 // checks of RunSpaceDelete: uncommitted changes and unpushed commits prompt for
 // confirmation before proceeding.
-func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out io.Writer) error {
+//
+// Special handling for always.repos entries: if the removed repo is in
+// cfg.Always.Repos and was a real worktree (not already a symlink), a symlink
+// is restored in its place rather than leaving the repo absent from the space.
+// Removing a repo that is currently a symlink leaves it absent (the user
+// explicitly opted out for this space).
+func RunSpaceRemove(cfg *config.Config, runner git.Runner, args SpaceRemoveArgs, in io.Reader, out io.Writer) error {
 	sp, err := state.Load(args.Name)
 	if err != nil {
 		return fmt.Errorf("load space %q: %w", args.Name, err)
@@ -94,9 +105,20 @@ func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out i
 		return fmt.Errorf("cannot remove all repos from space %q; use `wtg delete` instead", args.Name)
 	}
 
+	// Build the always.repos set for restore-symlink logic.
+	alwaysRepos := make(map[string]bool, len(cfg.Always.Repos))
+	for _, name := range cfg.Always.Repos {
+		alwaysRepos[name] = true
+	}
+
 	// Pre-flight: gather warnings about uncommitted or unpushed work.
+	// Symlink entries are skipped — they point to the shared main clone and
+	// their state is not specific to this space.
 	var warnings []string
 	for _, r := range toRemove {
+		if r.Symlink {
+			continue
+		}
 		st, err := runner.Status(r.WorktreePath)
 		if err != nil {
 			continue // worktree may have been externally deleted; skip
@@ -123,8 +145,8 @@ func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out i
 		}
 	}
 
-	// Remove worktrees. A SymFail result means the worktree is still present,
-	// so we must not update go.work or state.
+	// Remove worktrees / unlink symlinks. A SymFail result means the entry is
+	// still present, so we must not update go.work or state.
 	hadError := false
 	tbl := ui.NewTableWriter(out)
 	for _, r := range toRemove {
@@ -137,10 +159,11 @@ func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out i
 	tbl.Flush()
 
 	if hadError {
-		return fmt.Errorf("some worktrees could not be removed; space %q unchanged", args.Name)
+		return fmt.Errorf("some repos could not be removed; space %q unchanged", args.Name)
 	}
 
-	// Compute the repos that remain after removal.
+	// Compute the repos that remain after removal, restoring symlinks for any
+	// always-repo that was a real worktree.
 	removeSet := make(map[string]bool, len(toRemove))
 	for _, r := range toRemove {
 		removeSet[r.Name] = true
@@ -149,6 +172,21 @@ func RunSpaceRemove(runner git.Runner, args SpaceRemoveArgs, in io.Reader, out i
 	for _, r := range sp.Repos {
 		if !removeSet[r.Name] {
 			keepEntries = append(keepEntries, r)
+		}
+	}
+	// Restore symlinks for removed worktrees that are in always.repos.
+	for _, r := range toRemove {
+		if !r.Symlink && alwaysRepos[r.Name] {
+			if err := os.Symlink(r.RepoPath, r.WorktreePath); err != nil {
+				fmt.Fprintf(out, "  %s could not restore symlink for %s: %v\n", ui.SymWarn, r.Name, err)
+				continue
+			}
+			keepEntries = append(keepEntries, state.RepoEntry{
+				Name:         r.Name,
+				RepoPath:     r.RepoPath,
+				WorktreePath: r.WorktreePath,
+				Symlink:      true,
+			})
 		}
 	}
 

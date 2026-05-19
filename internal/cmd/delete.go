@@ -74,8 +74,13 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 	}
 
 	// Pre-flight: gather warnings about uncommitted or unpushed work.
+	// Symlink entries point to the shared main clone; their state is not
+	// specific to this space, so they are excluded from pre-flight checks.
 	var warnings []string
 	for _, r := range sp.Repos {
+		if r.Symlink {
+			continue
+		}
 		st, err := runner.Status(r.WorktreePath)
 		if err != nil {
 			continue // worktree may have been externally deleted; skip

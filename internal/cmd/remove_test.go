@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/state"
 )
@@ -25,7 +26,7 @@ func removeRunner(statusFn func(string) (git.RepoStatus, error)) *testRunner {
 func TestRunSpaceRemove_SpaceNotFound(t *testing.T) {
 	isolateState(t)
 	var out bytes.Buffer
-	err := RunSpaceRemove(&testRunner{}, SpaceRemoveArgs{Name: "nonexistent", Repos: []string{"api"}}, &bytes.Buffer{}, &out)
+	err := RunSpaceRemove(&config.Config{}, &testRunner{}, SpaceRemoveArgs{Name: "nonexistent", Repos: []string{"api"}}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when space does not exist")
 	}
@@ -38,7 +39,7 @@ func TestRunSpaceRemove_RepoNotInSpace(t *testing.T) {
 	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	var out bytes.Buffer
-	err := RunSpaceRemove(&testRunner{}, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out)
+	err := RunSpaceRemove(&config.Config{}, &testRunner{}, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when repo is not in space")
 	}
@@ -54,7 +55,7 @@ func TestRunSpaceRemove_AllRepos_Rejected(t *testing.T) {
 	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 
 	var out bytes.Buffer
-	err := RunSpaceRemove(&testRunner{}, SpaceRemoveArgs{Name: "feat", Repos: []string{"api"}}, &bytes.Buffer{}, &out)
+	err := RunSpaceRemove(&config.Config{}, &testRunner{}, SpaceRemoveArgs{Name: "feat", Repos: []string{"api"}}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when removing all repos")
 	}
@@ -79,7 +80,7 @@ func TestRunSpaceRemove_Success(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 
@@ -105,7 +106,7 @@ func TestRunSpaceRemove_MultipleRepos(t *testing.T) {
 	r := removeRunner(cleanStatus)
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend", "infra"}}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend", "infra"}}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 
@@ -132,7 +133,7 @@ func TestRunSpaceRemove_DirtyWorktree_UserDeclines(t *testing.T) {
 	r := removeRunner(dirtyStatus)
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, strings.NewReader("n\n"), &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, strings.NewReader("n\n"), &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 	// State should be unchanged.
@@ -165,7 +166,7 @@ func TestRunSpaceRemove_DirtyWorktree_UserConfirms(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, strings.NewReader("y\n"), &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, strings.NewReader("y\n"), &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 	if !usedForce {
@@ -192,7 +193,7 @@ func TestRunSpaceRemove_UnpushedCommits_Warned(t *testing.T) {
 	r := removeRunner(aheadStatus)
 
 	var out bytes.Buffer
-	_ = RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, strings.NewReader("n\n"), &out)
+	_ = RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, strings.NewReader("n\n"), &out)
 	if !strings.Contains(out.String(), "unpushed") {
 		t.Errorf("output should mention unpushed commits: %q", out.String())
 	}
@@ -216,7 +217,7 @@ func TestRunSpaceRemove_DeleteBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}, DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}, DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 	if deletedBranch != "mybranch" {
@@ -241,7 +242,7 @@ func TestRunSpaceRemove_ForceBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}, ForceBranch: true}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}, ForceBranch: true}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 	if !deletedForce {
@@ -285,7 +286,7 @@ func TestRunSpaceRemove_GoWorkUpdated(t *testing.T) {
 	r := removeRunner(cleanStatus)
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 
@@ -352,7 +353,7 @@ func TestRunSpaceRemove_LastGoModRepo_RemovesGoWork(t *testing.T) {
 	r := removeRunner(cleanStatus)
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"api"}}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"api"}}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 
@@ -418,7 +419,7 @@ func TestRunSpaceRemove_GoWorkSumRemovedOnUpdate(t *testing.T) {
 	r := removeRunner(cleanStatus)
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"infra"}}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"infra"}}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 
@@ -441,7 +442,7 @@ func TestRunSpaceRemove_WorktreeRemoveError_StatePreserved(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out)
+	err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when worktree removal fails")
 	}
@@ -472,7 +473,7 @@ func TestRunSpaceRemove_PartialWorktreeFailure_StatePreserved(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend", "infra"}}, &bytes.Buffer{}, &out)
+	err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend", "infra"}}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error on partial worktree failure")
 	}
@@ -497,10 +498,144 @@ func TestRunSpaceRemove_StatusError_SkippedSilently(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceRemove(r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"frontend"}}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceRemove: %v", err)
 	}
 	if strings.Contains(out.String(), "[y/N]") {
 		t.Errorf("should not prompt when status errors are skipped: %q", out.String())
+	}
+}
+
+// --- always.repos symlink handling ---
+
+// alwaysCfgRemove builds a config with the given always.repos list.
+func alwaysCfgRemove(alwaysRepos []string) *config.Config {
+	return &config.Config{
+		Always: config.AlwaysConfig{Repos: alwaysRepos},
+	}
+}
+
+func TestRunSpaceRemove_AlwaysRepo_WorktreeRestoresSymlink(t *testing.T) {
+	// When a worktree repo is in always.repos and removed, the symlink is restored.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	// State: api (worktree) + docs (worktree, but in always.repos).
+	makeSpace(t, "feat", "feat", spacePath, []string{"api", "docs"}, root)
+
+	r := removeRunner(cleanStatus)
+
+	cfg := alwaysCfgRemove([]string{"docs"})
+	var out bytes.Buffer
+	if err := RunSpaceRemove(cfg, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"docs"}}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceRemove: %v", err)
+	}
+
+	// Symlink should be restored at docs' worktree path.
+	docsLink := filepath.Join(spacePath, "docs")
+	target, err := os.Readlink(docsLink)
+	if err != nil {
+		t.Fatalf("docs symlink not restored: %v", err)
+	}
+	if target != filepath.Join(root, "docs") {
+		t.Errorf("symlink target: got %q, want %q", target, filepath.Join(root, "docs"))
+	}
+
+	// State should reflect docs back as a symlink.
+	sp, err := state.Load("feat")
+	if err != nil {
+		t.Fatalf("state.Load: %v", err)
+	}
+	var docsEntry *state.RepoEntry
+	for i := range sp.Repos {
+		if sp.Repos[i].Name == "docs" {
+			docsEntry = &sp.Repos[i]
+		}
+	}
+	if docsEntry == nil {
+		t.Fatal("docs should remain in state as a symlink after removal")
+	}
+	if !docsEntry.Symlink {
+		t.Error("docs state entry should have Symlink: true after restore")
+	}
+}
+
+func TestRunSpaceRemove_SymlinkEntry_RemovedWithoutRestore(t *testing.T) {
+	// Removing a repo that is already a symlink leaves it absent (user opt-out).
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	// Build state with docs as a symlink entry.
+	sp := &state.Space{
+		Name:   "feat",
+		Branch: "feat",
+		Path:   spacePath,
+	}
+	sp.Repos = []state.RepoEntry{
+		{Name: "api", RepoPath: filepath.Join(root, "api"), WorktreePath: filepath.Join(spacePath, "api")},
+		{Name: "docs", RepoPath: filepath.Join(root, "docs"), WorktreePath: filepath.Join(spacePath, "docs"), Symlink: true},
+	}
+	if err := state.Save(sp); err != nil {
+		t.Fatalf("state.Save: %v", err)
+	}
+
+	// Use a runner that panics on WorktreeRemove — symlinks should not use it.
+	r := &testRunner{
+		statusFn:         cleanStatus,
+		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
+	}
+
+	cfg := alwaysCfgRemove([]string{"docs"}) // docs is in always.repos
+	var out bytes.Buffer
+	if err := RunSpaceRemove(cfg, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"docs"}}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceRemove: %v", err)
+	}
+
+	// docs should be fully absent from state.
+	loaded, err := state.Load("feat")
+	if err != nil {
+		t.Fatalf("state.Load: %v", err)
+	}
+	for _, r := range loaded.Repos {
+		if r.Name == "docs" {
+			t.Error("docs should be absent from state after explicit removal of a symlink entry")
+		}
+	}
+}
+
+func TestRunSpaceRemove_SymlinkEntry_SkipsPreflightCheck(t *testing.T) {
+	// Pre-flight status checks are skipped for symlink entries.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	sp := &state.Space{
+		Name:   "feat",
+		Branch: "feat",
+		Path:   spacePath,
+	}
+	sp.Repos = []state.RepoEntry{
+		{Name: "api", RepoPath: filepath.Join(root, "api"), WorktreePath: filepath.Join(spacePath, "api")},
+		{Name: "docs", RepoPath: filepath.Join(root, "docs"), WorktreePath: filepath.Join(spacePath, "docs"), Symlink: true},
+	}
+	if err := state.Save(sp); err != nil {
+		t.Fatalf("state.Save: %v", err)
+	}
+
+	statusCalled := false
+	r := &testRunner{
+		statusFn: func(_ string) (git.RepoStatus, error) {
+			statusCalled = true
+			return git.RepoStatus{}, nil
+		},
+		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"docs"}}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceRemove: %v", err)
+	}
+
+	if statusCalled {
+		t.Error("Status should not be called for symlink entries during pre-flight")
 	}
 }

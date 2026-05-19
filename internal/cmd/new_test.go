@@ -695,3 +695,246 @@ func TestRunSpaceNew_NoGoWork_WhenNoGoMods(t *testing.T) {
 		t.Error("GoWorkspace should be false when no go.mod found")
 	}
 }
+
+// --- always.repos ---
+
+func alwaysCfg(root, spacesRoot string, alwaysRepos []string) *config.Config {
+	return &config.Config{
+		Discovery: config.DiscoveryConfig{RootDir: root, MaxDepth: 2},
+		Spaces:    config.SpacesConfig{RootDir: spacesRoot},
+		Always:    config.AlwaysConfig{Repos: alwaysRepos},
+	}
+}
+
+func TestRunSpaceNew_AlwaysRepos_SymlinkedIntoSpace(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	makeRepo(t, root, "docs")
+	cfg := alwaysCfg(root, spacesRoot, []string{"docs"})
+
+	var worktreeAdded []string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
+			worktreeAdded = append(worktreeAdded, worktreePath)
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+
+	// Only api gets a worktree; docs is symlinked.
+	if len(worktreeAdded) != 1 || !strings.Contains(worktreeAdded[0], "api") {
+		t.Errorf("expected 1 worktree add for api, got %v", worktreeAdded)
+	}
+
+	// docs symlink should exist in the space.
+	docsLink := filepath.Join(spacesRoot, "feat", "docs")
+	target, err := os.Readlink(docsLink)
+	if err != nil {
+		t.Fatalf("docs symlink not created: %v", err)
+	}
+	if target != filepath.Join(root, "docs") {
+		t.Errorf("symlink target: got %q, want %q", target, filepath.Join(root, "docs"))
+	}
+
+	// State should record docs as a symlink.
+	sp, err := state.Load("feat")
+	if err != nil {
+		t.Fatalf("state.Load: %v", err)
+	}
+	if len(sp.Repos) != 2 {
+		t.Fatalf("expected 2 repos in state, got %d", len(sp.Repos))
+	}
+	var docsEntry *state.RepoEntry
+	for i := range sp.Repos {
+		if sp.Repos[i].Name == "docs" {
+			docsEntry = &sp.Repos[i]
+		}
+	}
+	if docsEntry == nil {
+		t.Fatal("docs not in state")
+	}
+	if !docsEntry.Symlink {
+		t.Error("docs should be recorded as a symlink in state")
+	}
+}
+
+func TestRunSpaceNew_AlwaysRepos_ExplicitOverridesSymlink(t *testing.T) {
+	// When docs is in always.repos but also explicitly in args.Repos, it
+	// should get a real worktree, not a symlink.
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	makeRepo(t, root, "docs")
+	cfg := alwaysCfg(root, spacesRoot, []string{"docs"})
+
+	var worktreeAdded []string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
+			worktreeAdded = append(worktreeAdded, worktreePath)
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Repos: []string{"api", "docs"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+
+	// Both repos get worktrees; no symlink.
+	if len(worktreeAdded) != 2 {
+		t.Errorf("expected 2 worktree adds, got %d: %v", len(worktreeAdded), worktreeAdded)
+	}
+	docsLink := filepath.Join(spacesRoot, "feat", "docs")
+	if fi, err := os.Lstat(docsLink); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		t.Error("docs should not be a symlink when explicitly passed as a repo")
+	}
+}
+
+func TestRunSpaceNew_AlwaysRepos_UnknownRepo_Errors(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	cfg := alwaysCfg(root, spacesRoot, []string{"no-such-repo"})
+
+	var out bytes.Buffer
+	err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when always.repos entry not found")
+	}
+	if !strings.Contains(err.Error(), "no-such-repo") {
+		t.Errorf("error should mention the unknown repo: %v", err)
+	}
+}
+
+func TestRunSpaceNew_AlwaysRepos_NotInGoWork(t *testing.T) {
+	// A symlinked always-repo with a go.mod should NOT appear in go.work.
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	apiPath := makeRepo(t, root, "api")
+	if err := os.WriteFile(filepath.Join(apiPath, "go.mod"),
+		[]byte("module example.com/api\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	docsPath := makeRepo(t, root, "docs")
+	if err := os.WriteFile(filepath.Join(docsPath, "go.mod"),
+		[]byte("module example.com/docs\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	cfg := alwaysCfg(root, spacesRoot, []string{"docs"})
+
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(spacesRoot, "feat", "go.work"))
+	if err != nil {
+		t.Fatalf("go.work not written: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "./api") {
+		t.Errorf("go.work should reference ./api: %q", content)
+	}
+	if strings.Contains(content, "docs") {
+		t.Errorf("go.work should not reference symlinked docs repo: %q", content)
+	}
+}
+
+func TestRunSpaceNew_AlwaysRepos_RollbackRemovesSymlink(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	makeRepo(t, root, "docs")
+	cfg := alwaysCfg(root, spacesRoot, []string{"docs"})
+
+	// Make the state save fail so the saga rolls back.
+	blockFile := filepath.Join(t.TempDir(), "block")
+	if err := os.WriteFile(blockFile, nil, 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Setenv("XDG_DATA_HOME", blockFile)
+
+	var out bytes.Buffer
+	err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when state save fails")
+	}
+
+	docsLink := filepath.Join(spacesRoot, "feat", "docs")
+	if _, err := os.Lstat(docsLink); err == nil {
+		t.Error("docs symlink should be removed on rollback")
+	}
+}
+
+// --- always.files ---
+
+func TestRunSpaceNew_AlwaysFiles_CopiedIntoSpace(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+
+	// Create a source file to be copied.
+	srcFile := filepath.Join(t.TempDir(), "CLAUDE.md")
+	if err := os.WriteFile(srcFile, []byte("# context\n"), 0o644); err != nil {
+		t.Fatalf("write src file: %v", err)
+	}
+
+	cfg := &config.Config{
+		Discovery: config.DiscoveryConfig{RootDir: root, MaxDepth: 2},
+		Spaces:    config.SpacesConfig{RootDir: spacesRoot},
+		Always:    config.AlwaysConfig{Files: []string{srcFile}},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, createRunner(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+
+	dst := filepath.Join(spacesRoot, "feat", "CLAUDE.md")
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("copied file not found: %v", err)
+	}
+	if string(data) != "# context\n" {
+		t.Errorf("copied file content: got %q", string(data))
+	}
+}
+
+func TestRunSpaceNew_AlwaysFiles_MissingSource_Errors(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+
+	cfg := &config.Config{
+		Discovery: config.DiscoveryConfig{RootDir: root, MaxDepth: 2},
+		Spaces:    config.SpacesConfig{RootDir: spacesRoot},
+		Always:    config.AlwaysConfig{Files: []string{"/no/such/file.md"}},
+	}
+
+	r := &testRunner{
+		branchExistsFn:   func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn:    func(_, _, _, _ string, _ bool) error { return nil },
+		worktreeRemoveFn: func(_, _ string, _ bool) error { return nil },
+		branchDeleteFn:   func(_, _ string, _ bool) error { return nil },
+	}
+
+	var out bytes.Buffer
+	err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when always.files source is missing")
+	}
+}

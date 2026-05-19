@@ -25,9 +25,10 @@ type Space struct {
 
 // RepoEntry describes one repo's participation in a space.
 type RepoEntry struct {
-	Name         string `yaml:"name"`          // short name relative to discovery.root_dir
-	RepoPath     string `yaml:"repo_path"`     // absolute path to the main clone
-	WorktreePath string `yaml:"worktree_path"` // absolute path to the linked worktree
+	Name         string `yaml:"name"`               // short name relative to discovery.root_dir
+	RepoPath     string `yaml:"repo_path"`           // absolute path to the main clone
+	WorktreePath string `yaml:"worktree_path"`       // absolute path to the linked worktree or symlink
+	Symlink      bool   `yaml:"symlink,omitempty"`   // true if this entry is a symlink to the main clone
 }
 
 // DataDir returns the directory where space state files are stored, following

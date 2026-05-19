@@ -142,6 +142,10 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	results := make([]repoStatusResult, len(sp.Repos))
 	var g errgroup.Group
 	for i, r := range sp.Repos {
+		if r.Symlink {
+			results[i] = repoStatusResult{entry: r}
+			continue
+		}
 		g.Go(func() error {
 			st, err := runner.Status(r.WorktreePath)
 			results[i] = repoStatusResult{entry: r, st: st, err: err}
@@ -155,6 +159,13 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	var buf bytes.Buffer
 	tbl := ui.NewTableWriter(&buf)
 	for _, rs := range results {
+		if rs.entry.Symlink {
+			tbl.Row(
+				"  "+rs.entry.Name+" "+ui.Muted.Render(ui.SymLink),
+				ui.Muted.Render(rs.entry.RepoPath),
+			)
+			continue
+		}
 		tbl.Row(append([]string{"  " + rs.entry.Name}, worktreeStatusCols(rs.st, rs.err, sp.Branch)...)...)
 	}
 	tbl.Flush()
@@ -168,6 +179,9 @@ func printSpaceDetail(runner git.Runner, sp *state.Space, detailed bool, out io.
 	for i, rs := range results {
 		if i < len(lines) {
 			fmt.Fprintln(out, lines[i])
+		}
+		if rs.entry.Symlink {
+			continue
 		}
 		if rs.err == nil {
 			for _, f := range rs.st.Files {
