@@ -16,6 +16,7 @@ const (
 	SymWarn = "⚠"
 	SymFail = "!"
 	SymUp   = "↑"
+	SymLink = "→"
 )
 
 // Styles.

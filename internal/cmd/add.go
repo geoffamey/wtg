@@ -50,7 +50,9 @@ type SpaceAddArgs struct {
 }
 
 // RunSpaceAdd adds one or more repos to a workspace by creating worktrees on
-// the space's branch and updating the go.work file and state.
+// the space's branch and updating the go.work file and state. If a requested
+// repo is currently a symlink in the space (added via always.repos), the
+// symlink is replaced with a proper worktree on the space's branch.
 func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out io.Writer) error {
 	if cfg.Discovery.RootDir == "" {
 		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
@@ -64,13 +66,20 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 		return fmt.Errorf("load space %q: %w", args.Name, err)
 	}
 
-	// Reject repos already in the space.
-	existing := make(map[string]bool, len(sp.Repos))
+	// Partition requested repos into: upgrade from symlink, or add fresh.
+	existingByName := make(map[string]state.RepoEntry, len(sp.Repos))
 	for _, r := range sp.Repos {
-		existing[r.Name] = true
+		existingByName[r.Name] = r
 	}
+	var toUpgrade []state.RepoEntry // currently symlinks; will become worktrees
+	var toAdd []string              // repos not yet in the space
 	for _, name := range args.Repos {
-		if existing[name] {
+		r, ok := existingByName[name]
+		if !ok {
+			toAdd = append(toAdd, name)
+		} else if r.Symlink {
+			toUpgrade = append(toUpgrade, r)
+		} else {
 			return fmt.Errorf("repo %q is already in space %q", name, args.Name)
 		}
 	}
@@ -81,20 +90,56 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 	}
 	sort.Strings(allPaths)
 
-	newTargets, err := buildTargets(cfg.Discovery.RootDir, sp.Path, allPaths, args.Repos)
-	if err != nil {
+	// Build repoTargets for brand-new repos (not upgrades).
+	var newTargets []*repoTarget
+	if len(toAdd) > 0 {
+		newTargets, err = buildTargets(cfg.Discovery.RootDir, sp.Path, allPaths, toAdd)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Build repoTargets for symlink upgrades (same path, now a worktree).
+	upgradeTargets := make([]*repoTarget, len(toUpgrade))
+	for i, r := range toUpgrade {
+		upgradeTargets[i] = &repoTarget{
+			name:         r.Name,
+			repoPath:     r.RepoPath,
+			worktreePath: r.WorktreePath,
+		}
+	}
+
+	allNew := append(upgradeTargets, newTargets...)
+	if err := classifyBranchTargets(runner, allNew, sp.Branch); err != nil {
 		return err
 	}
 
-	if err := classifyBranchTargets(runner, newTargets, sp.Branch); err != nil {
-		return err
+	// Build the full target list for go.work: existing non-symlink repos +
+	// upgraded repos (now worktrees) + brand-new repos.
+	upgradedNames := make(map[string]bool, len(upgradeTargets))
+	for _, t := range upgradeTargets {
+		upgradedNames[t.name] = true
 	}
-
-	// Build the full target list (existing + new) for go.work.
-	allTargets := append(targetsFromState(sp), newTargets...)
+	var keepFromState []*repoTarget
+	for _, t := range targetsFromState(sp) {
+		if !upgradedNames[t.name] {
+			keepFromState = append(keepFromState, t)
+		}
+	}
+	allTargets := append(append(keepFromState, upgradeTargets...), newTargets...)
 	hasGoMod, anyGoMod := detectGoMods(allTargets)
 
 	var steps []saga.Step
+	// For each symlink being upgraded: remove the symlink, then add the worktree.
+	for i := range upgradeTargets {
+		t := upgradeTargets[i]
+		steps = append(steps, saga.Step{
+			Name: fmt.Sprintf("remove symlink %s", t.name),
+			Do:   func(ctx context.Context) error { return os.Remove(t.worktreePath) },
+			Undo: func(ctx context.Context) error { return os.Symlink(t.repoPath, t.worktreePath) },
+		})
+		steps = append(steps, worktreeStep(runner, t, sp.Branch, ""))
+	}
 	for i := range newTargets {
 		steps = append(steps, worktreeStep(runner, newTargets[i], sp.Branch, ""))
 	}
@@ -111,13 +156,22 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 		Do: func(ctx context.Context) error {
 			updated := oldState
 			updated.GoWorkspace = anyGoMod
-			for _, t := range newTargets {
-				updated.Repos = append(updated.Repos, state.RepoEntry{
+			// Rebuild repo list: keep non-upgraded existing entries, then add
+			// upgraded (now worktrees) and new repos.
+			var repos []state.RepoEntry
+			for _, r := range updated.Repos {
+				if !upgradedNames[r.Name] {
+					repos = append(repos, r)
+				}
+			}
+			for _, t := range allNew {
+				repos = append(repos, state.RepoEntry{
 					Name:         t.name,
 					RepoPath:     t.repoPath,
 					WorktreePath: t.worktreePath,
 				})
 			}
+			updated.Repos = repos
 			return state.Save(&updated)
 		},
 		Undo: func(ctx context.Context) error {
@@ -131,7 +185,7 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 
 	fmt.Fprintf(out, "%s added to space %q\n", ui.SymOK, args.Name)
 	tbl := ui.NewTableWriter(out)
-	for _, t := range newTargets {
+	for _, t := range allNew {
 		tbl.Row("  "+t.name, t.worktreePath)
 	}
 	tbl.Flush()

@@ -310,3 +310,99 @@ func TestRunSpaceAdd_RollbackRestoresGoWork(t *testing.T) {
 		t.Errorf("go.work not restored:\ngot:  %q\nwant: %q", string(data), oldGoWork)
 	}
 }
+
+// --- symlink upgrade ---
+
+// makeSpaceWithSymlink saves a space that has one regular worktree repo and
+// one always-repo entry (Symlink: true).
+func makeSpaceWithSymlink(t *testing.T, name, branch, spacePath, repoRoot, worktreeRepo, symlinkRepo string) *state.Space {
+	t.Helper()
+	sp := &state.Space{
+		Name:   name,
+		Branch: branch,
+		Path:   spacePath,
+	}
+	sp.Repos = append(sp.Repos, state.RepoEntry{
+		Name:         worktreeRepo,
+		RepoPath:     filepath.Join(repoRoot, worktreeRepo),
+		WorktreePath: filepath.Join(spacePath, worktreeRepo),
+	})
+	sp.Repos = append(sp.Repos, state.RepoEntry{
+		Name:         symlinkRepo,
+		RepoPath:     filepath.Join(repoRoot, symlinkRepo),
+		WorktreePath: filepath.Join(spacePath, symlinkRepo),
+		Symlink:      true,
+	})
+	if err := state.Save(sp); err != nil {
+		t.Fatalf("makeSpaceWithSymlink: %v", err)
+	}
+	return sp
+}
+
+func TestRunSpaceAdd_UpgradesSymlinkToWorktree(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	makeRepo(t, root, "docs")
+	spacePath := filepath.Join(spacesRoot, "feat")
+	if err := os.MkdirAll(spacePath, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// Create the symlink that was placed by wtg new.
+	docsLink := filepath.Join(spacePath, "docs")
+	if err := os.Symlink(filepath.Join(root, "docs"), docsLink); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+	makeSpaceWithSymlink(t, "feat", "feat", spacePath, root, "api", "docs")
+	cfg := spaceCreateCfg(root, spacesRoot)
+
+	var worktreeAdded []string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
+			worktreeAdded = append(worktreeAdded, worktreePath)
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceAdd(cfg, r, SpaceAddArgs{Name: "feat", Repos: []string{"docs"}}, &out); err != nil {
+		t.Fatalf("RunSpaceAdd: %v", err)
+	}
+
+	// docs should have gotten a worktree add call.
+	if len(worktreeAdded) != 1 || !strings.Contains(worktreeAdded[0], "docs") {
+		t.Errorf("expected worktree add for docs, got %v", worktreeAdded)
+	}
+
+	// State should reflect docs as a worktree (Symlink: false).
+	sp, err := state.Load("feat")
+	if err != nil {
+		t.Fatalf("state.Load: %v", err)
+	}
+	for _, r := range sp.Repos {
+		if r.Name == "docs" && r.Symlink {
+			t.Error("docs should not be marked as symlink after upgrade")
+		}
+	}
+}
+
+func TestRunSpaceAdd_NonSymlinkAlreadyInSpace_Errors(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	spacePath := filepath.Join(spacesRoot, "feat")
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	cfg := spaceCreateCfg(root, spacesRoot)
+
+	var out bytes.Buffer
+	err := RunSpaceAdd(cfg, &testRunner{}, SpaceAddArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when non-symlink repo already in space")
+	}
+	if !strings.Contains(err.Error(), "already in space") {
+		t.Errorf("error should mention already in space: %v", err)
+	}
+}

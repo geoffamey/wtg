@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/state"
 )
@@ -30,7 +31,7 @@ func cleanStatus(_ string) (git.RepoStatus, error) {
 func TestRunSpaceDelete_SpaceNotFound(t *testing.T) {
 	isolateState(t)
 	var out bytes.Buffer
-	err := RunSpaceDelete(&testRunner{}, SpaceDeleteArgs{Name: "nonexistent"}, &bytes.Buffer{}, &out)
+	err := RunSpaceDelete(&config.Config{}, &testRunner{}, SpaceDeleteArgs{Name: "nonexistent"}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when space does not exist")
 	}
@@ -52,7 +53,7 @@ func TestRunSpaceDelete_RemovesWorktrees(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if len(removed) != 2 {
@@ -78,7 +79,7 @@ func TestRunSpaceDelete_NotForced_WhenClean(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if usedForce {
@@ -101,7 +102,7 @@ func TestRunSpaceDelete_DirtyWorktree_UserDeclines(t *testing.T) {
 
 	var out bytes.Buffer
 	// "n\n" → user declines
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("n\n"), &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("n\n"), &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	// State should still exist (nothing deleted).
@@ -130,7 +131,7 @@ func TestRunSpaceDelete_DirtyWorktree_UserConfirms(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("y\n"), &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("y\n"), &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if !usedForce {
@@ -153,7 +154,7 @@ func TestRunSpaceDelete_UnpushedCommits_Warned(t *testing.T) {
 	r := deleteRunner(aheadStatus)
 
 	var out bytes.Buffer
-	_ = RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("n\n"), &out)
+	_ = RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("n\n"), &out)
 	if !strings.Contains(out.String(), "unpushed") {
 		t.Errorf("output should mention unpushed commits: %q", out.String())
 	}
@@ -177,7 +178,7 @@ func TestRunSpaceDelete_DeleteBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat", DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat", DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if deletedBranch != "mybranch" {
@@ -202,7 +203,7 @@ func TestRunSpaceDelete_ForceBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat", ForceBranch: true}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat", ForceBranch: true}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if !deletedForce {
@@ -224,7 +225,7 @@ func TestRunSpaceDelete_BranchDeleteFailure_StateStillDeleted(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat", DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat", DeleteBranch: true}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete should succeed when only branch deletion fails: %v", err)
 	}
 	// State should still be deleted — the worktree is gone.
@@ -247,7 +248,7 @@ func TestRunSpaceDelete_NoBranchDelete_WhenNoFlag(t *testing.T) {
 	// branchDeleteFn intentionally not set — panics if called unexpectedly.
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 }
@@ -272,7 +273,7 @@ func TestRunSpaceDelete_PartialFailure_StatePreserved(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out)
+	err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when one worktree removal fails")
 	}
@@ -319,7 +320,7 @@ func TestRunSpaceDelete_MixedDirtyClean_PromptFires(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("y\n"), &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, strings.NewReader("y\n"), &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	// Both repos should be removed with force=true since any warning triggers force.
@@ -341,7 +342,7 @@ func TestRunSpaceDelete_StatusError_SkippedSilently(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	// No prompt should have been written (no warnings).
@@ -356,7 +357,7 @@ func TestRunSpaceDelete_EmptySpace_DeletesState(t *testing.T) {
 	makeSpace(t, "feat", "feat", spacePath, nil, "")
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(&testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, &testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if _, err := state.Load("feat"); err == nil {
@@ -386,7 +387,7 @@ func TestRunSpaceDelete_RemovesGoWorkAndSum(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := RunSpaceDelete(&testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+	if err := RunSpaceDelete(&config.Config{}, &testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
 		t.Fatalf("RunSpaceDelete: %v", err)
 	}
 	if _, err := os.Stat(goWork); err == nil {
@@ -411,7 +412,7 @@ func TestRunSpaceDelete_WorktreeRemoveError_StatePreserved(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := RunSpaceDelete(r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out)
+	err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out)
 	if err == nil {
 		t.Fatal("expected error when worktree removal fails")
 	}
@@ -421,5 +422,39 @@ func TestRunSpaceDelete_WorktreeRemoveError_StatePreserved(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "locked worktree") {
 		t.Errorf("output should mention the error: %q", out.String())
+	}
+}
+
+// --- always.files cleanup ---
+
+func TestRunSpaceDelete_AlwaysFiles_RemovedBeforeDirectoryDelete(t *testing.T) {
+	isolateState(t)
+	spacePath := t.TempDir()
+	makeSpace(t, "feat", "feat", spacePath, nil, "")
+
+	// Seed a file that simulates what wtg new would have copied.
+	seeded := filepath.Join(spacePath, "CLAUDE.md")
+	if err := os.WriteFile(seeded, []byte("context\n"), 0o644); err != nil {
+		t.Fatalf("write seeded file: %v", err)
+	}
+
+	// Use a config that lists the source path (basename must match the seeded file).
+	srcPath := filepath.Join(t.TempDir(), "CLAUDE.md")
+	cfg := &config.Config{
+		Always: config.AlwaysConfig{Files: []string{srcPath}},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(cfg, &testRunner{}, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+
+	// The seeded file should be gone.
+	if _, err := os.Stat(seeded); err == nil {
+		t.Error("always.files copy should be removed on space delete")
+	}
+	// No warning about non-empty directory should appear.
+	if strings.Contains(out.String(), "directory not empty") {
+		t.Errorf("space directory should be removable after always.files cleanup: %q", out.String())
 	}
 }

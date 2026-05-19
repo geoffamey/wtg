@@ -13,6 +13,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/geoffamey/wtg/internal/config"
 	"github.com/geoffamey/wtg/internal/git"
 	"github.com/geoffamey/wtg/internal/state"
 	"github.com/geoffamey/wtg/internal/ui"
@@ -48,7 +49,11 @@ worktrees are cleaned up.`,
 			if cmd.Args().Len() == 0 {
 				return fmt.Errorf("missing required argument: <workspace>")
 			}
-			return RunSpaceDelete(runner, SpaceDeleteArgs{
+			cfg, err := config.Load(cmd.Root().String("config"))
+			if err != nil {
+				return err
+			}
+			return RunSpaceDelete(cfg, runner, SpaceDeleteArgs{
 				Name:         cmd.Args().First(),
 				DeleteBranch: cmd.Bool("delete-branch"),
 				ForceBranch:  cmd.Bool("force-delete-branch"),
@@ -67,15 +72,20 @@ type SpaceDeleteArgs struct {
 // RunSpaceDelete removes all worktrees belonging to a space. If -d or -D is
 // set, branches are also deleted. Prompts the user when uncommitted changes or
 // unpushed commits are detected; only deletes state once all removals succeed.
-func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out io.Writer) error {
+func RunSpaceDelete(cfg *config.Config, runner git.Runner, args SpaceDeleteArgs, in io.Reader, out io.Writer) error {
 	sp, err := state.Load(args.Name)
 	if err != nil {
 		return fmt.Errorf("load space %q: %w", args.Name, err)
 	}
 
 	// Pre-flight: gather warnings about uncommitted or unpushed work.
+	// Symlink entries point to the shared main clone; their state is not
+	// specific to this space, so they are excluded from pre-flight checks.
 	var warnings []string
 	for _, r := range sp.Repos {
+		if r.Symlink {
+			continue
+		}
 		st, err := runner.Status(r.WorktreePath)
 		if err != nil {
 			continue // worktree may have been externally deleted; skip
@@ -140,6 +150,14 @@ func RunSpaceDelete(runner git.Runner, args SpaceDeleteArgs, in io.Reader, out i
 		goWorkSumPath := filepath.Join(sp.Path, "go.work.sum")
 		if err := os.Remove(goWorkSumPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			fmt.Fprintf(out, "  %s could not remove go.work.sum: %v\n", ui.SymWarn, err)
+		}
+	}
+
+	// Remove any always.files copies that were seeded into the space root.
+	for _, f := range cfg.Always.Files {
+		dst := filepath.Join(sp.Path, filepath.Base(f))
+		if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(out, "  %s could not remove %s: %v\n", ui.SymWarn, filepath.Base(f), err)
 		}
 	}
 

@@ -79,6 +79,9 @@ type SpaceNewArgs struct {
 
 // RunSpaceNew creates a new workspace, checking out a worktree in each
 // selected repo and writing a go.work file if any repos are Go modules.
+// Repos listed in cfg.Always.Repos are symlinked into the space unless they
+// are also explicitly named in args.Repos (in which case they get a worktree).
+// Files listed in cfg.Always.Files are copied into the space root.
 func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out io.Writer) error {
 	if cfg.Spaces.RootDir == "" && args.Path == "" {
 		return fmt.Errorf("spaces.root_dir is not set; run `wtg init` or specify --path")
@@ -120,13 +123,19 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 		return err
 	}
 
-	hasGoMod, anyGoMod := detectGoMods(targets)
+	symlinkTargets, err := resolveAlwaysRepos(cfg, spacePath, allPaths, args.Repos)
+	if err != nil {
+		return err
+	}
+
+	allTargets := append(targets, symlinkTargets...)
+	hasGoMod, anyGoMod := detectGoMods(allTargets)
 
 	savedState := false
 	steps := []saga.Step{{
 		Name: "save state",
 		Do: func(ctx context.Context) error {
-			sp := buildSpaceState(args.Name, spacePath, branch, anyGoMod, targets)
+			sp := buildSpaceState(args.Name, spacePath, branch, anyGoMod, allTargets)
 			if err := state.Save(sp); err != nil {
 				return err
 			}
@@ -143,10 +152,16 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 	for i := range targets {
 		steps = append(steps, worktreeStep(runner, targets[i], branch, args.Base))
 	}
+	for i := range symlinkTargets {
+		steps = append(steps, symlinkStep(symlinkTargets[i]))
+	}
+	for _, f := range cfg.Always.Files {
+		steps = append(steps, copyFileStep(f, spacePath))
+	}
 	goWorkPath := filepath.Join(spacePath, "go.work")
 	if anyGoMod {
-		goVersion := detectGoVersion(targets, hasGoMod)
-		steps = append(steps, goWorkStep(goWorkPath, spacePath, targets, hasGoMod, goVersion))
+		goVersion := detectGoVersion(allTargets, hasGoMod)
+		steps = append(steps, goWorkStep(goWorkPath, spacePath, allTargets, hasGoMod, goVersion))
 	}
 
 	if err := saga.Run(context.Background(), steps); err != nil {
@@ -158,6 +173,47 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 	for _, t := range targets {
 		tbl.Row("  "+t.name, t.worktreePath)
 	}
+	for _, t := range symlinkTargets {
+		tbl.Row("  "+t.name, ui.Muted.Render(ui.SymLink+" "+t.repoPath))
+	}
 	tbl.Flush()
 	return nil
+}
+
+// resolveAlwaysRepos builds symlink targets for cfg.Always.Repos, skipping any
+// repo that appears in explicitRepos (those will get a proper worktree instead).
+// Returns an error if any always-repo name is not found under the discovery root.
+func resolveAlwaysRepos(cfg *config.Config, spacePath string, allPaths, explicitRepos []string) ([]*repoTarget, error) {
+	if len(cfg.Always.Repos) == 0 {
+		return nil, nil
+	}
+
+	explicitSet := make(map[string]bool, len(explicitRepos))
+	for _, r := range explicitRepos {
+		explicitSet[r] = true
+	}
+
+	byName := make(map[string]string, len(allPaths))
+	for _, p := range allPaths {
+		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+		byName[filepath.ToSlash(name)] = p
+	}
+
+	var out []*repoTarget
+	for _, name := range cfg.Always.Repos {
+		if explicitSet[name] {
+			continue
+		}
+		p, ok := byName[name]
+		if !ok {
+			return nil, fmt.Errorf("always.repos entry %q not found under %s", name, cfg.Discovery.RootDir)
+		}
+		out = append(out, &repoTarget{
+			name:         name,
+			repoPath:     p,
+			worktreePath: filepath.Join(spacePath, filepath.FromSlash(name)),
+			symlink:      true,
+		})
+	}
+	return out, nil
 }

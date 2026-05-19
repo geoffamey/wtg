@@ -23,9 +23,10 @@ import (
 type repoTarget struct {
 	name         string // short name relative to discovery.root_dir
 	repoPath     string // absolute path to the main clone
-	worktreePath string // absolute path for the new worktree
+	worktreePath string // absolute path for the new worktree or symlink
 	createBranch bool   // whether to create a new branch (set during pre-flight)
 	remoteBase   string // set when branch exists only on remote; used as start point for WorktreeAdd
+	symlink      bool   // true if this entry should be a symlink to the main clone, not a worktree
 }
 
 // targetsFromState converts existing state repo entries back into repoTargets.
@@ -36,6 +37,7 @@ func targetsFromState(sp *state.Space) []*repoTarget {
 			name:         r.Name,
 			repoPath:     r.RepoPath,
 			worktreePath: r.WorktreePath,
+			symlink:      r.Symlink,
 		}
 	}
 	return targets
@@ -118,9 +120,14 @@ func classifyBranchTargets(runner git.Runner, targets []*repoTarget, branch stri
 }
 
 // detectGoMods reports which targets have a go.mod in their main clone.
+// Symlink targets are excluded: they point to the shared main clone and are
+// not feature-branch worktrees, so including them in go.work would be incorrect.
 func detectGoMods(targets []*repoTarget) (hasGoMod []bool, anyGoMod bool) {
 	hasGoMod = make([]bool, len(targets))
 	for i, t := range targets {
+		if t.symlink {
+			continue
+		}
 		if _, err := os.Stat(filepath.Join(t.repoPath, "go.mod")); err == nil {
 			hasGoMod[i] = true
 			anyGoMod = true
@@ -218,6 +225,50 @@ func worktreeStep(runner git.Runner, t *repoTarget, branch, base string) saga.St
 	}
 }
 
+// symlinkStep returns a saga.Step that creates a symlink from worktreePath to
+// repoPath and removes it on rollback.
+func symlinkStep(t *repoTarget) saga.Step {
+	return saga.Step{
+		Name: fmt.Sprintf("create symlink %s", t.name),
+		Do: func(ctx context.Context) error {
+			parentDir := filepath.Dir(t.worktreePath)
+			if err := os.MkdirAll(parentDir, 0o755); err != nil {
+				return fmt.Errorf("create parent dir: %w", err)
+			}
+			return os.Symlink(t.repoPath, t.worktreePath)
+		},
+		Undo: func(ctx context.Context) error {
+			if err := os.Remove(t.worktreePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			_ = os.Remove(filepath.Dir(t.worktreePath))
+			return nil
+		},
+	}
+}
+
+// copyFileStep returns a saga.Step that copies src into dstDir and removes the
+// copy on rollback.
+func copyFileStep(src, dstDir string) saga.Step {
+	dst := filepath.Join(dstDir, filepath.Base(src))
+	return saga.Step{
+		Name: fmt.Sprintf("copy %s", filepath.Base(src)),
+		Do: func(ctx context.Context) error {
+			data, err := os.ReadFile(src)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", src, err)
+			}
+			return os.WriteFile(dst, data, 0o644)
+		},
+		Undo: func(ctx context.Context) error {
+			if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
 // goWorkStep returns a saga.Step that writes a go.work and restores the prior
 // content (or removes the file) on rollback.
 func goWorkStep(goWorkPath, spacePath string, targets []*repoTarget, hasGoMod []bool, goVersion string) saga.Step {
@@ -283,15 +334,24 @@ func buildSpaceState(name, spacePath, branch string, goWorkspace bool, targets [
 			Name:         t.name,
 			RepoPath:     t.repoPath,
 			WorktreePath: t.worktreePath,
+			Symlink:      t.symlink,
 		})
 	}
 	return sp
 }
 
-// deleteOne removes the worktree for one repo and optionally deletes its branch.
+// deleteOne removes the worktree (or symlink) for one repo and optionally
+// deletes its branch. Symlink entries are unlinked directly; branch deletion
+// flags are ignored for them since symlinks have no branch context in the space.
 // force causes WorktreeRemove to bypass git's dirty-check (used when the user
 // has already confirmed they want to proceed despite uncommitted changes).
 func deleteOne(runner git.Runner, r state.RepoEntry, branch string, deleteBranch, forceBranch, force bool) (sym, msg string) {
+	if r.Symlink {
+		if err := os.Remove(r.WorktreePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return ui.SymFail, fmt.Sprintf("remove symlink: %v", err)
+		}
+		return ui.SymOK, "symlink removed"
+	}
 	if err := runner.WorktreeRemove(r.RepoPath, r.WorktreePath, force); err != nil {
 		return ui.SymFail, fmt.Sprintf("remove worktree: %v", err)
 	}
