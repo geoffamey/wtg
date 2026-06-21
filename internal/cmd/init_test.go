@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/urfave/cli/v3"
 
 	"github.com/geoffamey/wtg/internal/config"
 )
@@ -14,7 +17,7 @@ import (
 func runInitWith(t *testing.T, configPath, input string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	err := RunInit(configPath, strings.NewReader(input), &out, false)
+	err := RunInit(configPath, strings.NewReader(input), &out, false, InitOverrides{})
 	return out.String(), err
 }
 
@@ -22,9 +25,12 @@ func runInitWith(t *testing.T, configPath, input string) (string, error) {
 func runInitDefaults(t *testing.T, configPath string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	err := RunInit(configPath, strings.NewReader(""), &out, true)
+	err := RunInit(configPath, strings.NewReader(""), &out, true, InitOverrides{})
 	return out.String(), err
 }
+
+// ptr returns a pointer to s, for building InitOverrides in tests.
+func ptr(s string) *string { return &s }
 
 func TestInit_WritesConfig(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "wtg", "config.yaml")
@@ -456,6 +462,178 @@ func TestInit_AlwaysSentinel_ClearsExistingValues(t *testing.T) {
 	}
 	if len(cfg.Always.Files) != 0 {
 		t.Errorf("Always.Files should be empty after -, got %v", cfg.Always.Files)
+	}
+}
+
+// --- non-interactive overrides / flags ---
+
+func TestInit_Overrides_NonInteractive(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	// Empty stdin: every value must come from the overrides, not a prompt.
+	var out bytes.Buffer
+	ov := InitOverrides{
+		DiscoveryRoot: ptr("~/over-repos"),
+		MaxDepth:      ptr("4"),
+		SpacesRoot:    ptr("~/over-spaces"),
+		BranchPrefix:  ptr("ovr/"),
+		AlwaysRepos:   ptr("docs, shared"),
+		AlwaysFiles:   ptr("~/.config/X.md"),
+		AlwaysRun:     ptr("~/bin/hook"),
+	}
+	if err := RunInit(cfgPath, strings.NewReader(""), &out, false, ov); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	if cfg.Discovery.RootDir != filepath.Join(home, "over-repos") {
+		t.Errorf("Discovery.RootDir: %q", cfg.Discovery.RootDir)
+	}
+	if cfg.Discovery.MaxDepth != 4 {
+		t.Errorf("MaxDepth: %d", cfg.Discovery.MaxDepth)
+	}
+	if cfg.Spaces.RootDir != filepath.Join(home, "over-spaces") {
+		t.Errorf("Spaces.RootDir: %q", cfg.Spaces.RootDir)
+	}
+	if cfg.Git.BranchPrefix != "ovr/" {
+		t.Errorf("BranchPrefix: %q", cfg.Git.BranchPrefix)
+	}
+	if len(cfg.Always.Repos) != 2 || cfg.Always.Repos[0] != "docs" {
+		t.Errorf("Always.Repos: %v", cfg.Always.Repos)
+	}
+	if cfg.Always.Run != filepath.Join(home, "bin/hook") {
+		t.Errorf("Always.Run: %q", cfg.Always.Run)
+	}
+}
+
+func TestInit_Overrides_SkipOnlySetPrompts(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	// Override discovery root and branch prefix; the remaining five prompts must
+	// still fire in order and consume these five input lines.
+	input := strings.Join([]string{
+		"3",            // max depth
+		"~/in-spaces",  // workspace root
+		"a, b",         // always repos
+		"~/in-file.md", // always files
+		"~/in-run",     // always run
+	}, "\n") + "\n"
+	var out bytes.Buffer
+	ov := InitOverrides{DiscoveryRoot: ptr("~/ov-repos"), BranchPrefix: ptr("ov/")}
+	if err := RunInit(cfgPath, strings.NewReader(input), &out, false, ov); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	if cfg.Discovery.RootDir != filepath.Join(home, "ov-repos") { // from override
+		t.Errorf("Discovery.RootDir: %q", cfg.Discovery.RootDir)
+	}
+	if cfg.Git.BranchPrefix != "ov/" { // from override
+		t.Errorf("BranchPrefix: %q", cfg.Git.BranchPrefix)
+	}
+	if cfg.Discovery.MaxDepth != 3 { // from prompt
+		t.Errorf("MaxDepth: %d", cfg.Discovery.MaxDepth)
+	}
+	if cfg.Spaces.RootDir != filepath.Join(home, "in-spaces") { // from prompt
+		t.Errorf("Spaces.RootDir: %q", cfg.Spaces.RootDir)
+	}
+	if len(cfg.Always.Repos) != 2 || cfg.Always.Repos[1] != "b" { // from prompt
+		t.Errorf("Always.Repos: %v", cfg.Always.Repos)
+	}
+	if cfg.Always.Run != filepath.Join(home, "in-run") { // from prompt
+		t.Errorf("Always.Run: %q", cfg.Always.Run)
+	}
+}
+
+func TestInit_Override_ClearsAlways(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	existing := strings.Join([]string{
+		"discovery:",
+		"  root_dir: ~/repos",
+		"  max_depth: 2",
+		"spaces:",
+		"  root_dir: ~/spaces",
+		"always:",
+		"  repos: [docs]",
+		"  run: ~/bin/hook",
+	}, "\n") + "\n"
+	if err := os.WriteFile(cfgPath, []byte(existing), 0o644); err != nil {
+		t.Fatalf("write existing: %v", err)
+	}
+
+	var out bytes.Buffer
+	ov := InitOverrides{AlwaysRepos: ptr("-"), AlwaysRun: ptr("-")}
+	// useDefaults skips the overwrite confirmation; overrides clear the two fields.
+	if err := RunInit(cfgPath, strings.NewReader(""), &out, true, ov); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	if len(cfg.Always.Repos) != 0 {
+		t.Errorf("Always.Repos should be cleared, got %v", cfg.Always.Repos)
+	}
+	if cfg.Always.Run != "" {
+		t.Errorf("Always.Run should be cleared, got %q", cfg.Always.Run)
+	}
+}
+
+func TestInit_Override_InvalidMaxDepth(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	var out bytes.Buffer
+	ov := InitOverrides{MaxDepth: ptr("not-a-number")}
+	if err := RunInit(cfgPath, strings.NewReader(""), &out, true, ov); err == nil {
+		t.Fatal("expected error for invalid --max-depth override")
+	}
+}
+
+// initApp wraps InitCommand in a root with the global --config flag.
+func initApp() *cli.Command {
+	return &cli.Command{
+		Name:     "wtg",
+		Flags:    []cli.Flag{&cli.StringFlag{Name: "config"}},
+		Commands: []*cli.Command{InitCommand()},
+	}
+}
+
+func TestInit_Flags_Wired(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	err := initApp().Run(context.Background(), []string{
+		"wtg", "--config", cfgPath, "init", "--defaults",
+		"--repo-dir", "~/cli-repos", "--branch-prefix", "cli/", "--max-depth", "5",
+		"--always-run", "~/cli-hook",
+	})
+	if err != nil {
+		t.Fatalf("init run: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	if cfg.Discovery.RootDir != filepath.Join(home, "cli-repos") {
+		t.Errorf("Discovery.RootDir: %q", cfg.Discovery.RootDir)
+	}
+	if cfg.Discovery.MaxDepth != 5 {
+		t.Errorf("MaxDepth: %d", cfg.Discovery.MaxDepth)
+	}
+	if cfg.Git.BranchPrefix != "cli/" {
+		t.Errorf("BranchPrefix: %q", cfg.Git.BranchPrefix)
+	}
+	if cfg.Always.Run != filepath.Join(home, "cli-hook") {
+		t.Errorf("Always.Run: %q", cfg.Always.Run)
+	}
+	// Unset flags fall back to factory defaults under --defaults.
+	if cfg.Spaces.RootDir != filepath.Join(home, "spaces") {
+		t.Errorf("Spaces.RootDir should be default, got %q", cfg.Spaces.RootDir)
 	}
 }
 

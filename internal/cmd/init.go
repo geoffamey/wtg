@@ -34,29 +34,73 @@ func InitCommand() *cli.Command {
 If a config file already exists its values are offered as defaults, so pressing
 enter on every prompt preserves the current configuration.
 
-Use --defaults to accept all factory defaults without prompting.`,
+Each setting also has a flag (--repo-dir, --max-depth, --spaces-dir,
+--branch-prefix, --always-repos, --always-files, --always-run) that sets it and
+skips its prompt. Combine the flags with --defaults for a fully non-interactive
+run: flags set what you pass, factory defaults fill the rest, and an existing
+config is overwritten without confirmation.`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "defaults",
-				Usage: "accept all defaults without prompting",
+				Usage: "accept defaults without prompting (also skips the overwrite confirmation)",
 			},
+			&cli.StringFlag{Name: "repo-dir", Usage: "set discovery.root_dir and skip its prompt"},
+			&cli.StringFlag{Name: "max-depth", Usage: "set discovery.max_depth and skip its prompt"},
+			&cli.StringFlag{Name: "spaces-dir", Usage: "set spaces.root_dir and skip its prompt"},
+			&cli.StringFlag{Name: "branch-prefix", Usage: "set git.branch_prefix and skip its prompt"},
+			&cli.StringFlag{Name: "always-repos", Usage: "set always.repos (comma-separated; - to clear) and skip its prompt"},
+			&cli.StringFlag{Name: "always-files", Usage: "set always.files (comma-separated; - to clear) and skip its prompt"},
+			&cli.StringFlag{Name: "always-run", Usage: "set always.run (path; - to clear) and skip its prompt"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			cfgPath := cmd.String("config")
 			if cfgPath == "" {
 				cfgPath = config.DefaultPath()
 			}
-			return RunInit(cfgPath, os.Stdin, os.Stdout, cmd.Bool("defaults"))
+			// A flag pointer is set only when the flag was passed, so an unset
+			// flag falls through to the prompt or the default.
+			strPtr := func(name string) *string {
+				if cmd.IsSet(name) {
+					v := cmd.String(name)
+					return &v
+				}
+				return nil
+			}
+			ov := InitOverrides{
+				DiscoveryRoot: strPtr("repo-dir"),
+				MaxDepth:      strPtr("max-depth"),
+				SpacesRoot:    strPtr("spaces-dir"),
+				BranchPrefix:  strPtr("branch-prefix"),
+				AlwaysRepos:   strPtr("always-repos"),
+				AlwaysFiles:   strPtr("always-files"),
+				AlwaysRun:     strPtr("always-run"),
+			}
+			return RunInit(cfgPath, os.Stdin, os.Stdout, cmd.Bool("defaults"), ov)
 		},
 	}
 }
 
+// InitOverrides carries values supplied via flags. A non-nil field overrides
+// both the interactive prompt and the --defaults value for that setting; the
+// list fields (AlwaysRepos/AlwaysFiles) and AlwaysRun accept "-" to clear.
+type InitOverrides struct {
+	DiscoveryRoot *string
+	MaxDepth      *string
+	SpacesRoot    *string
+	BranchPrefix  *string
+	AlwaysRepos   *string // comma-separated
+	AlwaysFiles   *string // comma-separated
+	AlwaysRun     *string
+}
+
 // RunInit runs the init wizard, reading prompts from in and writing output to out.
-// When useDefaults is true all prompts are skipped and factory defaults are accepted.
-// In interactive mode, the current config file (if any) is loaded first and its
-// values are offered as prompt defaults, so pressing enter on every question
-// preserves the existing configuration.
-func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) error {
+// When useDefaults is true all unset prompts are skipped and factory defaults are
+// accepted. In interactive mode, the current config file (if any) is loaded first
+// and its values are offered as prompt defaults, so pressing enter on every question
+// preserves the existing configuration. Any field set in ov overrides both the
+// prompt and the default, which is how the per-setting flags drive a non-interactive
+// run.
+func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool, ov InitOverrides) error {
 	r := bufio.NewReader(in)
 
 	const (
@@ -82,69 +126,55 @@ func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) e
 		}
 	}
 
-	var (
-		discoveryRoot string
-		maxDepthStr   string
-		spacesRoot    string
-		branchPrefix  string
-		alwaysRepos   string
-		alwaysFiles   string
-		alwaysRun     string
-		err           error
-	)
+	// resolve returns the value for one setting: an explicit override wins;
+	// otherwise the factory default in --defaults mode, or an interactive prompt
+	// seeded with the current value (falling back to the factory default).
+	resolve := func(override *string, factoryDef, currentVal, promptMsg string) (string, error) {
+		if override != nil {
+			return *override, nil
+		}
+		if useDefaults {
+			return factoryDef, nil
+		}
+		def := factoryDef
+		if currentVal != "" {
+			def = currentVal
+		}
+		return prompt(r, out, promptMsg, def)
+	}
 
-	if useDefaults {
-		discoveryRoot = defaultDiscoveryRoot
-		maxDepthStr = defaultMaxDepth
-		spacesRoot = defaultSpacesRoot
-		branchPrefix = defaultBranchPrefix
-	} else {
-		discRootDef := defaultDiscoveryRoot
-		if current.Discovery.RootDir != "" {
-			discRootDef = current.Discovery.RootDir
-		}
-		discoveryRoot, err = prompt(r, out, "Discovery root (where your repos live)", discRootDef)
-		if err != nil {
-			return err
-		}
+	curMaxDepth := ""
+	if current.Discovery.MaxDepth > 0 {
+		curMaxDepth = strconv.Itoa(current.Discovery.MaxDepth)
+	}
 
-		maxDepthDef := defaultMaxDepth
-		if current.Discovery.MaxDepth > 0 {
-			maxDepthDef = strconv.Itoa(current.Discovery.MaxDepth)
-		}
-		maxDepthStr, err = prompt(r, out, "Max scan depth", maxDepthDef)
-		if err != nil {
-			return err
-		}
-
-		spacesRootDef := defaultSpacesRoot
-		if current.Spaces.RootDir != "" {
-			spacesRootDef = current.Spaces.RootDir
-		}
-		spacesRoot, err = prompt(r, out, "Workspace root (where spaces will be created)", spacesRootDef)
-		if err != nil {
-			return err
-		}
-
-		branchPrefix, err = prompt(r, out, `Branch prefix (optional, e.g. "yourname/")`, current.Git.BranchPrefix)
-		if err != nil {
-			return err
-		}
-
-		alwaysRepos, err = prompt(r, out, "Always-included repos, comma-separated (optional, - to clear)", joinSlice(current.Always.Repos))
-		if err != nil {
-			return err
-		}
-
-		alwaysFiles, err = prompt(r, out, "Always-copied files, comma-separated paths (optional, - to clear)", joinSlice(current.Always.Files))
-		if err != nil {
-			return err
-		}
-
-		alwaysRun, err = prompt(r, out, "Event script, run after a space is created/changed/deleted (optional, - to clear)", current.Always.Run)
-		if err != nil {
-			return err
-		}
+	discoveryRoot, err := resolve(ov.DiscoveryRoot, defaultDiscoveryRoot, current.Discovery.RootDir, "Discovery root (where your repos live)")
+	if err != nil {
+		return err
+	}
+	maxDepthStr, err := resolve(ov.MaxDepth, defaultMaxDepth, curMaxDepth, "Max scan depth")
+	if err != nil {
+		return err
+	}
+	spacesRoot, err := resolve(ov.SpacesRoot, defaultSpacesRoot, current.Spaces.RootDir, "Workspace root (where spaces will be created)")
+	if err != nil {
+		return err
+	}
+	branchPrefix, err := resolve(ov.BranchPrefix, defaultBranchPrefix, current.Git.BranchPrefix, `Branch prefix (optional, e.g. "yourname/")`)
+	if err != nil {
+		return err
+	}
+	alwaysRepos, err := resolve(ov.AlwaysRepos, "", joinSlice(current.Always.Repos), "Always-included repos, comma-separated (optional, - to clear)")
+	if err != nil {
+		return err
+	}
+	alwaysFiles, err := resolve(ov.AlwaysFiles, "", joinSlice(current.Always.Files), "Always-copied files, comma-separated paths (optional, - to clear)")
+	if err != nil {
+		return err
+	}
+	alwaysRun, err := resolve(ov.AlwaysRun, "", current.Always.Run, "Event script, run after a space is created/changed/deleted (optional, - to clear)")
+	if err != nil {
+		return err
 	}
 
 	maxDepth, err := strconv.Atoi(maxDepthStr)
