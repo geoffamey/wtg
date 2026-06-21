@@ -67,6 +67,23 @@ their default branch (`main`, `master`, etc.) and otherwise left untouched.
 
 Override with `--config <path>` or the `WTG_CONFIG` environment variable.
 
+### Always-included repos, files, and hooks
+
+The optional `always` section applies the same setup to every new space:
+
+```yaml
+always:
+  repos: [shared-tooling]            # symlinked into every new space
+  files: [~/.config/wtg/CLAUDE.md]   # copied into every new space root
+  run: ~/.config/wtg/on-event        # executable run after create/add/remove/delete
+```
+
+`always.repos` symlinks shared repos in (no feature-branch worktree),
+`always.files` seeds template files, and `always.run` invokes a hook script on
+space lifecycle events with the space context in `WTG_*` environment variables.
+See [docs/always.md](docs/always.md) for the full behaviour, the event/variable
+reference, and examples.
+
 ## Quick start
 
 ```sh
