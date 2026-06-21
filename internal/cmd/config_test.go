@@ -2,14 +2,80 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/geoffamey/wtg/internal/config"
 )
+
+// configApp wraps ConfigCommand in a root carrying the global --config flag.
+func configApp() *cli.Command {
+	return &cli.Command{
+		Name:     "wtg",
+		Flags:    []cli.Flag{&cli.StringFlag{Name: "config"}},
+		Commands: []*cli.Command{ConfigCommand()},
+	}
+}
+
+// TestConfigInit_DoesNotClobberLegacyYAML is a regression test: `config init`
+// without -o must write the canonical config.toml, never overwrite an existing
+// config.yaml with TOML content.
+func TestConfigInit_DoesNotClobberLegacyYAML(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	wtgDir := filepath.Join(dir, "wtg")
+	if err := os.MkdirAll(wtgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yamlPath := filepath.Join(wtgDir, "config.yaml")
+	yamlContent := "discovery:\n  root_dir: ~/myrepos\n"
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := configApp().Run(context.Background(), []string{"wtg", "config", "init", "--force"}); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+
+	got, _ := os.ReadFile(yamlPath)
+	if string(got) != yamlContent {
+		t.Errorf("config.yaml was modified: %q", got)
+	}
+	tomlData, err := os.ReadFile(filepath.Join(wtgDir, "config.toml"))
+	if err != nil {
+		t.Fatalf("config.toml not created: %v", err)
+	}
+	if string(tomlData) != configTemplate {
+		t.Error("config.toml is not the template")
+	}
+}
+
+func TestConfigInit_RejectsNonTOMLOutput(t *testing.T) {
+	err := runConfigInit(filepath.Join(t.TempDir(), "config.yaml"), true, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected error writing TOML template to a .yaml path")
+	}
+}
+
+func TestConfigInit_NotesShadowedYAML(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("x: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runConfigInit(filepath.Join(dir, "config.toml"), false, &out); err != nil {
+		t.Fatalf("runConfigInit: %v", err)
+	}
+	if !strings.Contains(out.String(), "config.yaml") {
+		t.Errorf("expected a shadow note mentioning config.yaml, got %q", out.String())
+	}
+}
 
 func TestConfigInit_WritesTemplate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wtg", "config.toml")

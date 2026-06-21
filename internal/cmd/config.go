@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -78,9 +79,16 @@ already exists; pass --force to overwrite. -o sets the output path;
 					&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Usage: "output path, or - for stdout"},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
+					// Default to the canonical config.toml, not ResolvePath: the latter
+					// prefers an existing legacy config.yaml, and writing the TOML
+					// template into a .yaml file would corrupt it. An explicit --config
+					// or -o still wins.
 					out := cmd.String("output")
 					if out == "" {
-						out = config.ResolvePath(cmd.String("config"))
+						out = cmd.String("config")
+					}
+					if out == "" {
+						out = config.DefaultPath()
 					}
 					return runConfigInit(out, cmd.Bool("force"), os.Stdout)
 				},
@@ -119,6 +127,11 @@ func runConfigInit(path string, force bool, out io.Writer) error {
 		_, err := io.WriteString(out, configTemplate)
 		return err
 	}
+	// The template is TOML, so refuse to write it anywhere Load would parse as
+	// something else (a .yaml target would silently become a broken config).
+	if ext := strings.ToLower(filepath.Ext(path)); ext != ".toml" {
+		return fmt.Errorf("config init writes a TOML template; output path must end in .toml (got %s)", path)
+	}
 	if !force {
 		if _, err := os.Stat(path); err == nil {
 			return fmt.Errorf("config already exists at %s (use --force to overwrite)", path)
@@ -131,5 +144,12 @@ func runConfigInit(path string, force bool, out io.Writer) error {
 		return fmt.Errorf("write config: %w", err)
 	}
 	fmt.Fprintf(out, "Config written to %s\n", path)
+	// A sibling config.yaml still loads, but config.toml now takes precedence;
+	// warn so its settings don't silently appear to vanish.
+	if legacy := filepath.Join(filepath.Dir(path), "config.yaml"); legacy != path {
+		if _, err := os.Stat(legacy); err == nil {
+			fmt.Fprintf(out, "Note: %s still exists but is now shadowed by config.toml.\n", legacy)
+		}
+	}
 	return nil
 }
