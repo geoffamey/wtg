@@ -57,9 +57,6 @@ type SpaceAddArgs struct {
 // repo is currently a symlink in the space (added via always.repos), the
 // symlink is replaced with a proper worktree on the space's branch.
 func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out io.Writer) error {
-	if cfg.Discovery.RootDir == "" {
-		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
-	}
 	if len(args.Repos) == 0 {
 		return fmt.Errorf("no repos specified")
 	}

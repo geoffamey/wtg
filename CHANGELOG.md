@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `wtg config` command group: `wtg config` prints the resolved config file, `wtg config init` scaffolds a commented TOML template (`--force`, `-o PATH`, `-o -`), `wtg config path` prints the resolved path
+- TOML config support; the parser is selected by file extension, so existing `config.yaml` files keep loading
+- `always.run` config key — an executable run after a space is created, changed, or deleted (see `docs/always.md`)
+
+### Changed
+
+- Config is now TOML-primary: the default path is `$XDG_CONFIG_HOME/wtg/config.toml`
+
+### Removed
+
+- `wtg init` interactive wizard, replaced by `wtg config init`
+
+## [1.2.0] - 2026-05-19
+
+### Added
+
+- `always.repos` and `always.files` config keys — repos symlinked into and files copied into every new space
+
+## [1.1.0] - 2026-05-18
+
+### Changed
+
+- `wtg status` always shows all spaces, with the current space sorted first
+- `wtg new` requires at least one repo argument, and saves workspace state before the saga runs so cleanup covers a partial creation
+
+### Fixed
+
+- `wtg push` sets the upstream on first push and detects remote-only branches
+
 ## [1.0.0] - 2026-04-08
 
 Initial public release.
@@ -26,5 +57,7 @@ Initial public release.
 - XDG Base Directory-compliant config (`$XDG_CONFIG_HOME/wtg/config.yaml`) and state (`$XDG_DATA_HOME/wtg/spaces/`)
 - `--config` flag and `WTG_CONFIG` environment variable for config file override
 
-[Unreleased]: https://github.com/geoffamey/wtg/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/geoffamey/wtg/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/geoffamey/wtg/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/geoffamey/wtg/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/geoffamey/wtg/releases/tag/v1.0.0

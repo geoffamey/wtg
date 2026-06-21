@@ -189,24 +189,24 @@ stop the rest — matching how wtg treats the top-level script.
 
 ## Putting it together
 
-```yaml
-discovery:
-  root_dir: ~/repos
-spaces:
-  root_dir: ~/spaces
-git:
-  branch_prefix: alice/
+```toml
+[discovery]
+root_dir = "~/repos"
 
-always:
-  repos: [shared-tooling]
-  files:
-    - ~/.config/wtg/CLAUDE.md
-    - ~/.config/wtg/.envrc
-  run: ~/.config/wtg/on-event
+[spaces]
+root_dir = "~/spaces"
+
+[git]
+branch_prefix = "alice/"
+
+[always]
+repos = ["shared-tooling"]
+files = ["~/.config/wtg/CLAUDE.md", "~/.config/wtg/.envrc"]
+run = "~/.config/wtg/on-event"
 ```
 
 With this config, `wtg new my-feature api` creates the `api` worktree, symlinks
 `shared-tooling`, copies `CLAUDE.md` and `.envrc` into the space root, and then
 runs `on-event` with `WTG_SPACE_EVENT=create`.
 
-You can set all of these interactively with `wtg init`.
+Scaffold a config file with these settings (commented out) using `wtg config init`.

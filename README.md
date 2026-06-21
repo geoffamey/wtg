@@ -41,25 +41,31 @@ end
 
 ## Configuration
 
-Run `wtg init` to create `~/.config/wtg/config.yaml` interactively:
+Run `wtg config init` to scaffold a commented config file at
+`~/.config/wtg/config.toml`:
 
 ```sh
-wtg init
+wtg config init
 ```
 
-Or write the config directly:
+It writes every setting commented out with its default; uncomment and edit the
+lines you want to override. `wtg config` prints the resolved file, and
+`wtg config path` prints its path. A minimal config looks like:
 
-```yaml
-discovery:
-  root_dir: ~/repos       # where wtg scans for git repos
-  max_depth: 2
+```toml
+[discovery]
+root_dir = "~/repos"       # where wtg scans for git repos
+max_depth = 2
 
-spaces:
-  root_dir: ~/workspaces  # where workspaces are created
+[spaces]
+root_dir = "~/workspaces"  # where workspaces are created
 
-git:
-  branch_prefix: ""       # prepended to workspace names, e.g. "yourname/"
+[git]
+branch_prefix = ""         # prepended to workspace names, e.g. "yourname/"
 ```
+
+YAML is still accepted: a file ending in `.yaml`/`.yml` loads via its extension,
+so an existing `config.yaml` keeps working.
 
 `discovery.root_dir` should contain your regular repo clones, each sitting on
 their default branch (`main`, `master`, etc.) and otherwise left untouched.
@@ -71,11 +77,11 @@ Override with `--config <path>` or the `WTG_CONFIG` environment variable.
 
 The optional `always` section applies the same setup to every new space:
 
-```yaml
-always:
-  repos: [shared-tooling]            # symlinked into every new space
-  files: [~/.config/wtg/CLAUDE.md]   # copied into every new space root
-  run: ~/.config/wtg/on-event        # executable run after create/add/remove/delete
+```toml
+[always]
+repos = ["shared-tooling"]          # symlinked into every new space
+files = ["~/.config/wtg/CLAUDE.md"] # copied into every new space root
+run = "~/.config/wtg/on-event"      # executable run after create/add/remove/delete
 ```
 
 `always.repos` symlinks shared repos in (no feature-branch worktree),

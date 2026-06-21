@@ -150,10 +150,6 @@ func isGitRepo(path string) bool {
 // is empty, all discovered repos are fetched. Otherwise args are short names
 // (relative to discovery.root_dir) to fetch.
 func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Writer) error {
-	if cfg.Discovery.RootDir == "" {
-		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
-	}
-
 	paths, err := resolveRepoPaths(cfg, args)
 	if err != nil {
 		return err
@@ -187,10 +183,6 @@ func RunFetch(cfg *config.Config, runner git.Runner, args []string, out io.Write
 // empty, all discovered repos are synced. Otherwise, args are short names
 // (relative to discovery.root_dir) to sync.
 func RunSync(cfg *config.Config, runner git.Runner, args []string, out io.Writer) error {
-	if cfg.Discovery.RootDir == "" {
-		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
-	}
-
 	paths, err := resolveRepoPaths(cfg, args)
 	if err != nil {
 		return err
@@ -300,10 +292,6 @@ func resolveRepoPaths(cfg *config.Config, args []string) ([]string, error) {
 // and ahead/behind counts relative to origin. When long is true, the remote
 // URL and absolute path are appended in a muted style.
 func RunRepoStatus(cfg *config.Config, runner git.Runner, args []string, long bool, out io.Writer) error {
-	if cfg.Discovery.RootDir == "" {
-		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
-	}
-
 	paths, err := resolveRepoPaths(cfg, args)
 	if err != nil {
 		return err

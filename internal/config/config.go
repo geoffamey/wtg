@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/env"
@@ -46,35 +47,71 @@ type GitConfig struct {
 }
 
 // DefaultPath returns the default config file path following the XDG Base Directory
-// spec: $XDG_CONFIG_HOME/wtg/config.yaml, falling back to ~/.config/wtg/config.yaml.
+// spec: $XDG_CONFIG_HOME/wtg/config.toml, falling back to ~/.config/wtg/config.toml.
 func DefaultPath() string {
 	dir := os.Getenv("XDG_CONFIG_HOME")
 	if dir == "" {
 		dir = filepath.Join(os.Getenv("HOME"), ".config")
 	}
-	return filepath.Join(dir, "wtg", "config.yaml")
+	return filepath.Join(dir, "wtg", "config.toml")
 }
 
-// Load loads configuration from (in order): built-in defaults, the YAML file at path,
-// and WTG_* environment variables. If path is empty, DefaultPath() is used.
-// A missing config file is not an error.
-func Load(path string) (*Config, error) {
-	if path == "" {
-		path = DefaultPath()
+// ResolvePath returns the config file actually in effect. An explicit path (e.g.
+// from --config) is returned unchanged. Otherwise the default config.toml is used
+// if it exists, else a legacy config.yaml alongside it, else the default
+// config.toml path (where `wtg config init` would write).
+func ResolvePath(explicit string) string {
+	if explicit != "" {
+		return explicit
 	}
+	def := DefaultPath()
+	if _, err := os.Stat(def); err == nil {
+		return def
+	}
+	legacy := filepath.Join(filepath.Dir(def), "config.yaml")
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return def
+}
+
+// parserFor selects a koanf parser by file extension.
+func parserFor(path string) (koanf.Parser, error) {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".toml":
+		return toml.Parser(), nil
+	case ".yaml", ".yml":
+		return yaml.Parser(), nil
+	default:
+		return nil, fmt.Errorf("unsupported config extension %q (want .toml, .yaml, or .yml)", filepath.Ext(path))
+	}
+}
+
+// Load loads configuration from (in order): built-in defaults, the config file at
+// path, and WTG_* environment variables. The parser is chosen by the file's
+// extension. If path is empty, ResolvePath resolves it (default .toml, legacy
+// .yaml fallback). A missing config file is not an error.
+func Load(path string) (*Config, error) {
+	path = ResolvePath(path)
 
 	k := koanf.New(".")
 
 	// 1. Built-in defaults.
 	if err := k.Load(confmap.Provider(map[string]any{
+		"discovery.root_dir":  "~/repos",
 		"discovery.max_depth": 2,
+		"spaces.root_dir":     "~/spaces",
 	}, "."), nil); err != nil {
 		return nil, fmt.Errorf("load defaults: %w", err)
 	}
 
 	// 2. Config file (optional — missing is not an error).
 	if _, err := os.Stat(path); err == nil {
-		if err := k.Load(file.Provider(path), yaml.Parser()); err != nil {
+		parser, err := parserFor(path)
+		if err != nil {
+			return nil, err
+		}
+		if err := k.Load(file.Provider(path), parser); err != nil {
 			return nil, fmt.Errorf("load config %s: %w", path, err)
 		}
 	}

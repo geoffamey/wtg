@@ -22,11 +22,11 @@ func main() {
 			&cli.StringFlag{
 				Name:    "config",
 				Sources: cli.EnvVars("WTG_CONFIG"),
-				Usage:   "path to config file (default: $XDG_CONFIG_HOME/wtg/config.yaml)",
+				Usage:   "path to config file (default: $XDG_CONFIG_HOME/wtg/config.toml)",
 			},
 		},
 		Commands: []*cli.Command{
-			cmd.InitCommand(),
+			cmd.ConfigCommand(),
 			cmd.RepoCommand(git.New()),
 			cmd.StatusCommand(git.New()),
 			cmd.NewCommand(git.New()),
