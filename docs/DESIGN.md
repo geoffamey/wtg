@@ -324,6 +324,7 @@ new users. It prompts for:
 - Optional branch name prefix (e.g. `yourname/`)
 - Optional always-included repos (symlinked into every new space)
 - Optional always-copied files (copied into every new space root)
+- Optional event script (`always.run`, executed after space changes)
 
 When a config file already exists, its values are offered as prompt defaults so
 pressing enter on every prompt preserves the current configuration; the wizard

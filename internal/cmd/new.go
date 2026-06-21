@@ -32,8 +32,8 @@ any of the included repos have a go.mod.
 At least one repo must be specified. If the branch already exists in a repo
 it is checked out as-is — no reset or rebase is performed.
 
-Any always.repos are symlinked into the workspace and any always.files are
-copied into its root.`,
+Any always.repos are symlinked into the workspace, any always.files are copied
+into its root, and any always.run hook fires once the workspace is created.`,
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
