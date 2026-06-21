@@ -18,8 +18,8 @@ import (
 // configTemplate is the commented config scaffold written by `wtg config init`.
 // Every parameter is shown commented out with its default; commented means the
 // built-in default applies, so future default changes still reach users.
-const configTemplate = `# wtg configuration. Every setting is shown commented out with its default value.
-# Uncomment a line and edit it to override that default.
+const configTemplate = `# wtg configuration. Every setting is shown commented out with its default, or an
+# example value where the default is empty. Uncomment a line and edit it to override.
 
 [discovery]
 # Directory wtg scans to find your git repos. Anything matching under here can be
@@ -43,15 +43,18 @@ const configTemplate = `# wtg configuration. Every setting is shown commented ou
 
 [always]
 # Repos symlinked into every new space without getting their own worktree. Use it
-# for shared docs or tooling you want on hand but never branch.
+# for shared docs or tooling you want on hand but never branch. Default is none;
+# example:
 # repos = ["docs"]
 
 # Files copied into the root of every new space. Good for editor configs, direnv
-# files, or a CLAUDE.md you want present in every workspace.
+# files, or a CLAUDE.md you want present in every workspace. Default is none;
+# example:
 # files = ["~/.config/wtg/CLAUDE.md"]
 
 # Executable run after a space is created, changed, or deleted. It receives the
 # event type and the space path through environment variables. See docs/always.md.
+# Default is none; example:
 # run = "~/.config/wtg/on-event.sh"
 `
 
