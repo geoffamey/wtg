@@ -1,6 +1,7 @@
 # wtg
 
-See `README.md` for user-facing design and `docs/DESIGN.md` for architecture decisions.
+- `README.md` — user-facing docs: install, usage, and configuration. Start here.
+- `docs/` — longer-form docs. `DESIGN.md` records architecture decisions and rationale for contributors; feature guides (e.g. `always.md`) explain individual features in depth for users.
 
 ## Conventions
 
