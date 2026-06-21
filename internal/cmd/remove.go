@@ -224,5 +224,11 @@ func RunSpaceRemove(cfg *config.Config, runner git.Runner, args SpaceRemoveArgs,
 	}
 
 	fmt.Fprintf(out, "%s removed from space %q\n", ui.SymOK, args.Name)
+
+	removedNames := make([]string, len(toRemove))
+	for i, r := range toRemove {
+		removedNames[i] = r.Name
+	}
+	runSpaceScript(cfg, "remove", &updated, removedNames, out)
 	return nil
 }

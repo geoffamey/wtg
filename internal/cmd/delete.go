@@ -167,5 +167,9 @@ func RunSpaceDelete(cfg *config.Config, runner git.Runner, args SpaceDeleteArgs,
 		fmt.Fprintf(out, "  %s could not remove space directory %s: %v\n", ui.SymWarn, sp.Path, err)
 	}
 
-	return state.Delete(args.Name)
+	if err := state.Delete(args.Name); err != nil {
+		return err
+	}
+	runSpaceScript(cfg, "delete", sp, repoNames(sp), out)
+	return nil
 }

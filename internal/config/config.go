@@ -26,6 +26,7 @@ type Config struct {
 type AlwaysConfig struct {
 	Repos []string `koanf:"repos" yaml:"repos"` // symlinked into every new space
 	Files []string `koanf:"files" yaml:"files"` // copied into every new space root
+	Run   string   `koanf:"run"   yaml:"run"`   // executable run after space lifecycle events
 }
 
 // DiscoveryConfig controls repo scanning.
@@ -106,6 +107,7 @@ func Load(path string) (*Config, error) {
 	for i, f := range cfg.Always.Files {
 		cfg.Always.Files[i] = expandTilde(f)
 	}
+	cfg.Always.Run = expandTilde(cfg.Always.Run)
 
 	return &cfg, nil
 }

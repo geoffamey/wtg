@@ -29,6 +29,7 @@ func InitCommand() *cli.Command {
   git.branch_prefix    prefix prepended to workspace names to form branch names
   always.repos         repos symlinked into every new space
   always.files         files copied into every new space root
+  always.run           executable run after a space is created/changed/deleted
 
 The always.repos and always.files prompts take a comma-separated list on a
 single line; enter a single - to clear an existing value.
@@ -91,6 +92,7 @@ func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) e
 		branchPrefix  string
 		alwaysRepos   string
 		alwaysFiles   string
+		alwaysRun     string
 		err           error
 	)
 
@@ -141,6 +143,11 @@ func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) e
 		if err != nil {
 			return err
 		}
+
+		alwaysRun, err = prompt(r, out, "Event script, run after a space is created/changed/deleted (optional, - to clear)", current.Always.Run)
+		if err != nil {
+			return err
+		}
 	}
 
 	maxDepth, err := strconv.Atoi(maxDepthStr)
@@ -162,6 +169,7 @@ func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) e
 		Always: config.AlwaysConfig{
 			Repos: splitSlice(alwaysRepos),
 			Files: splitSlice(alwaysFiles),
+			Run:   singleValue(alwaysRun),
 		},
 	}
 
@@ -183,6 +191,16 @@ func RunInit(configPath string, in io.Reader, out io.Writer, useDefaults bool) e
 // joinSlice formats a string slice as a comma-separated string for display in prompts.
 func joinSlice(s []string) string {
 	return strings.Join(s, ", ")
+}
+
+// singleValue trims a single-value prompt result. Empty input (keep current) and
+// the sentinel "-" (explicit clear) both yield "".
+func singleValue(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "-" {
+		return ""
+	}
+	return s
 }
 
 // splitSlice parses a comma-separated string into a trimmed string slice.

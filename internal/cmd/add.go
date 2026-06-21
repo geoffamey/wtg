@@ -188,9 +188,15 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 
 	fmt.Fprintf(out, "%s added to space %q\n", ui.SymOK, args.Name)
 	tbl := ui.NewTableWriter(out)
-	for _, t := range allNew {
+	addedNames := make([]string, len(allNew))
+	for i, t := range allNew {
 		tbl.Row("  "+t.name, t.worktreePath)
+		addedNames[i] = t.name
 	}
 	tbl.Flush()
+
+	if sp, err := state.Load(args.Name); err == nil {
+		runSpaceScript(cfg, "add", sp, addedNames, out)
+	}
 	return nil
 }
