@@ -59,10 +59,6 @@ spaces:
 
 git:
   branch_prefix: ""       # prepended to workspace names, e.g. "yourname/"
-
-always:
-  repos: []               # repos symlinked into every new space (e.g. shared tooling)
-  files: []               # files copied into every new space root (e.g. a CLAUDE.md template)
 ```
 
 `discovery.root_dir` should contain your regular repo clones, each sitting on
