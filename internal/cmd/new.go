@@ -177,6 +177,9 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 		tbl.Row("  "+t.name, ui.Muted.Render(ui.SymLink+" "+t.repoPath))
 	}
 	tbl.Flush()
+
+	sp := buildSpaceState(args.Name, spacePath, branch, anyGoMod, allTargets)
+	runSpaceScript(cfg, "create", sp, repoNames(sp), out)
 	return nil
 }
 

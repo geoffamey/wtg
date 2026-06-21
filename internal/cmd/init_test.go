@@ -285,6 +285,63 @@ func TestInit_AlwaysReposAndFiles(t *testing.T) {
 	}
 }
 
+func TestInit_AlwaysRun(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	input := strings.Join([]string{
+		"~/repos",            // discovery root
+		"2",                  // max depth
+		"~/spaces",           // workspace root
+		"",                   // branch prefix
+		"",                   // always repos
+		"",                   // always files
+		"~/bin/wtg-on-event", // always run
+	}, "\n") + "\n"
+
+	if _, err := runInitWith(t, cfgPath, input); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	want := filepath.Join(home, "bin/wtg-on-event") // config.Load expands ~/
+	if cfg.Always.Run != want {
+		t.Errorf("Always.Run: got %q, want %q", cfg.Always.Run, want)
+	}
+}
+
+func TestInit_AlwaysRun_SentinelClears(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	existing := strings.Join([]string{
+		"discovery:",
+		"  root_dir: ~/repos",
+		"  max_depth: 2",
+		"spaces:",
+		"  root_dir: ~/spaces",
+		"always:",
+		"  run: ~/bin/wtg-on-event",
+	}, "\n") + "\n"
+	if err := os.WriteFile(cfgPath, []byte(existing), 0o644); err != nil {
+		t.Fatalf("write existing: %v", err)
+	}
+
+	// Confirm overwrite, enter through everything, type "-" at the run prompt.
+	input := "y\n\n\n\n\n\n\n-\n"
+	if _, err := runInitWith(t, cfgPath, input); err != nil {
+		t.Fatalf("RunInit: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+	if cfg.Always.Run != "" {
+		t.Errorf("Always.Run should be empty after -, got %q", cfg.Always.Run)
+	}
+}
+
 func TestInit_ExistingConfig_UsedAsDefaults(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
 	// Write an existing config with non-default values including always entries.
