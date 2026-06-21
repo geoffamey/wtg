@@ -13,9 +13,11 @@ import (
 // PathCommand returns the `wtg path` command (hidden; used by shell wcd functions).
 func PathCommand() *cli.Command {
 	return &cli.Command{
-		Name:          "path",
-		Usage:         "print the root path of a workspace",
-		ArgsUsage:     "<workspace>",
+		Name:      "path",
+		Usage:     "print the root path of a workspace",
+		ArgsUsage: "<workspace>",
+		Description: `Prints the absolute root path of a workspace to stdout. This backs the
+wcd shell helper, which uses it to cd into a workspace by name.`,
 		Hidden:        true,
 		ShellComplete: completeSpaces,
 		Action: func(ctx context.Context, cmd *cli.Command) error {

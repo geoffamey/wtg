@@ -1,22 +1,28 @@
 # Design Notes
 
-Key architectural decisions and rationale. This is a living document — update it when decisions change.
+Decisions and rationale for contributors. The code is the source of truth for
+signatures, schemas, and exact behaviour; this document explains *why* things are
+the way they are and links to the relevant files rather than copying their contents
+(which only goes stale). Update it when a decision changes, not when a signature does.
+User-facing usage lives in `README.md`.
 
 ## Library Choices
 
+Versions are pinned in `go.mod`; only the choice and rationale live here.
+
 | Concern | Library | Rationale |
 |---------|---------|-----------|
-| CLI framework | `github.com/urfave/cli/v2` | Lightweight, idiomatic, good subcommand support |
-| Configuration | `github.com/knadh/koanf/v2` | Multi-source (file, env, flags), clean layering |
+| CLI framework | `urfave/cli` | Lightweight, idiomatic, good subcommand support |
+| Configuration | `knadh/koanf` | Multi-source (file, env, flags), clean layering |
 | Git operations | System `git` via `os/exec` | See below |
 | `go.work` files | `golang.org/x/mod/modfile` | Official parser/writer, no shelling out needed |
-| Terminal UI / colors | `github.com/charmbracelet/lipgloss` | Composable styling, no TUI required |
-| Confirmation prompts | `github.com/charmbracelet/huh` | Fits CLI use case, charm ecosystem consistency |
+| Terminal UI / colors | `lipgloss` | Composable styling, no TUI required |
+| Confirmation prompts | hand-rolled (`internal/cmd/prompt.go`) | A yes/no reader over stdin; no prompt library needed |
 
 ### Why system `git` instead of go-git
 
 The initial design targeted `go-git/go-git/v6` (pre-release) to avoid a dependency on the
-host system's git version. After a spike (see `spikes/go-git-worktrees/README.md`), we
+host system's git version. After a spike (see `spikes/go-git-worktree-support.md`), we
 concluded the tradeoffs favor shelling out to system git:
 
 **go-git v6 costs:**
@@ -40,59 +46,21 @@ opportunistically — see the State Validation section.
 
 ## Git Abstraction Layer
 
-All git operations are routed through a `GitRunner` interface defined in `internal/git/runner.go`.
-The production implementation shells out to system git. Tests use a mock or a real git repo
-in a temp directory.
+All git operations go through a single `Runner` interface — the authoritative
+definition lives in `internal/git/runner.go`, so it is not reproduced here. The
+production implementation shells out to system git; tests use a mock or a real git
+repo created with `internal/git/testhelper`.
 
-```go
-// internal/git/runner.go
+The interface groups operations into:
 
-type WorktreeInfo struct {
-    Path    string
-    HEAD    string // commit hash
-    Branch  string // empty if detached
-    Bare    bool
-    Locked  bool
-}
+- **Worktrees** — add, remove, list, repair
+- **Branches** — local and remote existence, delete, merged-check
+- **Status** — working-tree, upstream, and ahead/behind state
+- **Sync** — fetch, fast-forward, push, rebase, default-branch lookup
+- **Info** — remote URL
 
-type FileStatus struct {
-    Path    string
-    Index   byte // porcelain v2 XY code, X = index
-    Worktree byte // Y = worktree
-}
-
-type RepoStatus struct {
-    Branch    string
-    Upstream  string // empty if no upstream
-    Ahead     int
-    Behind    int
-    Files     []FileStatus
-}
-
-type Runner interface {
-    // Worktrees
-    WorktreeAdd(repoPath, worktreePath, branch string, createBranch bool) error
-    WorktreeRemove(repoPath, worktreePath string, force bool) error
-    WorktreeList(repoPath string) ([]WorktreeInfo, error)
-    WorktreeRepair(repoPath string, paths ...string) error // no-op + warn on git < 2.29
-
-    // Branches
-    BranchExists(repoPath, branch string) (bool, error)
-    BranchDelete(repoPath, branch string, force bool) error
-    BranchMerged(repoPath, branch string) (bool, error) // merged into HEAD?
-
-    // Status
-    Status(repoPath string) (RepoStatus, error) // git status --porcelain=v2 --branch
-
-    // Sync
-    DefaultBranch(repoPath string) (string, error)
-    Fetch(repoPath string) error
-    FastForward(repoPath, branch string) error
-
-    // Info
-    RemoteURL(repoPath, remote string) (string, error)
-}
-```
+`git worktree repair` (git ≥ 2.29) is surfaced through `ErrRepairUnsupported` on
+older git, so callers can fall back to printing manual recovery instructions.
 
 ### Scripting-safe git output formats
 
@@ -120,7 +88,7 @@ real git output formats.
 
 ## Transactions / Saga Pattern
 
-Commands that mutate state (`space create`, `space add`, `space delete`) follow a
+Commands that mutate state (`wtg new`, `wtg add`, `wtg delete`) follow a
 pre-flight + saga rollback pattern.
 
 ### Pre-flight checks
@@ -135,37 +103,21 @@ If any pre-flight check fails, the command errors immediately with no side effec
 
 ### Rollback on mid-operation failure
 
-Each mutating step registers a compensating action. If a later step fails, completed
-steps are unwound in reverse order:
+Each mutating step registers a compensating action — a `Do` and an `Undo`
+(`internal/saga/saga.go`):
 
 ```go
-// internal/saga/saga.go
-
 type Step struct {
     Name string
     Do   func(ctx context.Context) error
     Undo func(ctx context.Context) error // called on rollback; errors are logged, not fatal
 }
-
-func Run(ctx context.Context, steps []Step) error {
-    var done []Step
-    for _, step := range steps {
-        if err := step.Do(ctx); err != nil {
-            for i := len(done) - 1; i >= 0; i-- {
-                if cerr := done[i].Undo(ctx); cerr != nil {
-                    // log compensation failure; continue unwinding
-                }
-            }
-            return fmt.Errorf("step %q: %w", step.Name, err)
-        }
-        done = append(done, step)
-    }
-    return nil
-}
 ```
 
-No external saga library is used — the pattern is ~30 lines and carries no dependency risk.
-Existing Go saga libraries have low adoption and awkward APIs.
+`saga.Run` executes steps in order; if one fails, the already-completed steps are
+unwound in reverse by calling their `Undo`. No external saga library is used — the
+pattern is a few dozen lines and carries no dependency risk. Existing Go saga
+libraries have low adoption and awkward APIs.
 
 Compensation failures (e.g. `git worktree remove` failing mid-rollback) are logged and
 reported to the user but do not prevent the remaining rollback steps from running.
@@ -187,15 +139,19 @@ intentionally minimal.
 
 ### Space state schema
 
+The Go type (`state.Space` in `internal/state/state.go`) is authoritative. A written
+file looks like:
+
 ```yaml
 name: myfeature
 path: /Users/geoff/workspaces/myfeature   # absolute, tilde-expanded
 branch: geoff/myfeature                   # branch shared across all repos in this space
 created_at: 2026-03-27T10:00:00Z
 repos:
-  - name: myorg/api                       # short name (relative to repos_root)
+  - name: myorg/api                       # short name (relative to discovery.root_dir)
     repo_path: /Users/geoff/repos/myorg/api
     worktree_path: /Users/geoff/workspaces/myfeature/myorg/api
+    symlink: true                         # present for always.repos entries: a symlink to the main clone, not a worktree
 go_workspace: true                        # whether a go.work was generated
 ```
 
@@ -235,7 +191,7 @@ parent directories:
 ```
 
 In the standard (non-nested) case the short name is just the directory name, so there is
-no added complexity for the common workflow. When used in commands like `space create`,
+no added complexity for the common workflow. When used in commands like `wtg new`,
 users can specify `foo/api` to be explicit or `api` if it is unambiguous.
 
 Repo listings also include the remote `origin` URL to make repos easy to identify:
@@ -248,13 +204,13 @@ bar/api      https://github.com/bar/api.git           /Users/geoff/repos/bar/api
 
 ## Worktree Layout
 
-Workspace directories mirror the repo short name structure (relative path from `repos_root`).
+Workspace directories mirror the repo short name structure (relative path from `discovery.root_dir`).
 For non-nested repos the result is a flat directory. For nested repos the org-level directory
 is created automatically.
 
 ```
 <space-root>/          # default: <spaces.root_dir>/<space-name>; overridable with --path
-  <repo-short-name>/   # mirrors nesting from repos_root
+  <repo-short-name>/   # mirrors nesting from discovery.root_dir
   go.work
 ```
 
@@ -289,18 +245,18 @@ This eliminates any collision risk: two repos with the same leaf name but differ
 paths produce distinct worktree directories, matching the short name that identified them.
 
 The default space root is `<spaces.root_dir>/<space-name>`. The `--path` flag on
-`space create` overrides this for the specific space being created; `space add` inherits
+`wtg new` overrides this for the specific space being created; `wtg add` inherits
 the path stored in the space state.
 
 ## Branch Strategy
 
 - Default branch name: `<git.branch_prefix><space-name>` (prefix may be empty)
-- `--branch` flag on `space create` overrides the generated name
+- `--branch` flag on `wtg new` overrides the generated name
 - All repos in a space share the same branch name
 
 ### Branch conflict rules
 
-Evaluated per-repo during `space create` and `space add`:
+Evaluated per-repo during `wtg new` and `wtg add`:
 
 | Branch state in repo | Action |
 |---|---|
@@ -314,7 +270,7 @@ conflict is detected.
 
 ## go.work Generation
 
-When `space create` or `space add` runs, `golang.org/x/mod/modfile` is used to read and
+When `wtg new` or `wtg add` runs, `golang.org/x/mod/modfile` is used to read and
 write `go.work` files — no shelling out to the `go` binary required.
 
 - Each repo with a `go.mod` at its root gets a `use` directive
@@ -335,7 +291,7 @@ use (
 )
 ```
 
-## `space delete` and Branch Safety
+## `wtg delete` and Branch Safety
 
 Following git's own `-d`/`-D` convention:
 - No flag: remove worktrees only, leave branches
@@ -350,11 +306,11 @@ If either is true, a summary is printed and the user is prompted to confirm.
 
 ## `repo sync` Scope
 
-`repo sync` operates exclusively on the main clones in `repos_dir` — it does NOT touch
+`repo sync` operates exclusively on the main clones in `discovery.root_dir` — it does NOT touch
 workspace worktrees. This is intentional: worktrees are on feature branches, not the
 default branch, and should be rebased/merged explicitly by the developer.
 
-When `space create` runs, it branches from the current HEAD of the local default branch.
+When `wtg new` runs, it branches from the current HEAD of the local default branch.
 Users should run `repo sync` first to ensure they're branching from the latest upstream.
 
 ## `wtg init`
@@ -362,9 +318,15 @@ Users should run `repo sync` first to ensure they're branching from the latest u
 `wtg init` is an interactive setup wizard that creates `~/.config/wtg/config.yaml` for
 new users. It prompts for:
 
-- One or more root paths to scan for git repositories
+- Discovery root to scan for git repositories
 - Max scan depth (default: 2)
 - Workspace root directory (where space directories will be created)
 - Optional branch name prefix (e.g. `yourname/`)
+- Optional always-included repos (symlinked into every new space)
+- Optional always-copied files (copied into every new space root)
+- Optional event script (`always.run`, executed after space changes)
 
-Running `wtg init` on an existing config prompts to confirm before overwriting.
+When a config file already exists, its values are offered as prompt defaults so
+pressing enter on every prompt preserves the current configuration; the wizard
+confirms before overwriting. `--defaults` skips all prompts and accepts the
+factory defaults.
