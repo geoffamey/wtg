@@ -165,6 +165,28 @@ while IFS= read -r path; do
 done <<< "$WTG_REPO_PATHS"
 ```
 
+### Example: a hooks directory
+
+`always.run` is a single script, but the `WTG_*` variables are exported, so any
+program it runs inherits them. That makes a `run-parts`-style dispatcher a few
+lines: point `always.run` at this, and drop independent hooks into `hooks.d/`.
+
+```bash
+#!/usr/bin/env bash
+# always.run → runs every executable in hooks.d, sorted by name.
+hooks="${WTG_HOOKS_DIR:-$HOME/.config/wtg/hooks.d}"
+[ -d "$hooks" ] || exit 0
+for h in "$hooks"/*; do
+  [ -f "$h" ] && [ -x "$h" ] || continue   # skip dirs, non-executables, backup files
+  "$h" || echo "wtg hook failed: $h (exit $?)" >&2
+done
+```
+
+Each hook in `hooks.d` sees the full environment and does its own
+`case "$WTG_SPACE_EVENT"` branching. Name them `10-direnv`, `20-editor`, etc. to
+control order. The `|| echo` keeps it best-effort, so one failing hook does not
+stop the rest — matching how wtg treats the top-level script.
+
 ## Putting it together
 
 ```yaml
