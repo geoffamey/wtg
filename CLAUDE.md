@@ -1,7 +1,6 @@
 # wtg
 
 See `README.md` for user-facing design and `docs/DESIGN.md` for architecture decisions.
-See `PLAN.md` for current implementation status.
 
 ## Conventions
 

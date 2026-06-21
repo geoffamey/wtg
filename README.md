@@ -59,6 +59,10 @@ spaces:
 
 git:
   branch_prefix: ""       # prepended to workspace names, e.g. "yourname/"
+
+always:
+  repos: []               # repos symlinked into every new space (e.g. shared tooling)
+  files: []               # files copied into every new space root (e.g. a CLAUDE.md template)
 ```
 
 `discovery.root_dir` should contain your regular repo clones, each sitting on
@@ -132,7 +136,7 @@ wtg remove my-feature logging
 wtg remove my-feature logging -d  # also delete the branch
 ```
 
-### `wtg status [<workspace>]`
+### `wtg status [<workspace>...]`
 
 Show workspace status. Without arguments, shows all workspaces — the one
 containing the current directory is listed first. Pass `--long` / `-l` to
