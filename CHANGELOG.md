@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-21
+
 ### Added
 
 - `wtg config` command group: `wtg config` prints the resolved config file, `wtg config init` scaffolds a commented TOML template (`--force`, `-o PATH`, `-o -`), `wtg config path` prints the resolved path
@@ -57,7 +59,8 @@ Initial public release.
 - XDG Base Directory-compliant config (`$XDG_CONFIG_HOME/wtg/config.yaml`) and state (`$XDG_DATA_HOME/wtg/spaces/`)
 - `--config` flag and `WTG_CONFIG` environment variable for config file override
 
-[Unreleased]: https://github.com/geoffamey/wtg/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/geoffamey/wtg/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/geoffamey/wtg/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/geoffamey/wtg/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/geoffamey/wtg/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/geoffamey/wtg/releases/tag/v1.0.0
