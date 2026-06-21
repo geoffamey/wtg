@@ -14,8 +14,11 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.Discovery.MaxDepth != 2 {
 		t.Errorf("MaxDepth: got %d, want 2", cfg.Discovery.MaxDepth)
 	}
-	if cfg.Discovery.RootDir != "" {
-		t.Errorf("RootDir: got %q, want empty", cfg.Discovery.RootDir)
+	if cfg.Discovery.RootDir != expandTilde("~/repos") {
+		t.Errorf("RootDir: got %q, want default ~/repos", cfg.Discovery.RootDir)
+	}
+	if cfg.Spaces.RootDir != expandTilde("~/spaces") {
+		t.Errorf("Spaces.RootDir: got %q, want default ~/spaces", cfg.Spaces.RootDir)
 	}
 }
 
@@ -59,8 +62,8 @@ discovery:
 	if cfg.Discovery.MaxDepth != 5 {
 		t.Errorf("MaxDepth: got %d, want 5", cfg.Discovery.MaxDepth)
 	}
-	if cfg.Discovery.RootDir != "" {
-		t.Errorf("RootDir should be empty, got %q", cfg.Discovery.RootDir)
+	if cfg.Discovery.RootDir != expandTilde("~/repos") {
+		t.Errorf("RootDir should fall back to default ~/repos, got %q", cfg.Discovery.RootDir)
 	}
 }
 
@@ -126,7 +129,7 @@ func TestLoad_MissingFile_NotAnError(t *testing.T) {
 
 func TestDefaultPath_XDG(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
-	if got := DefaultPath(); got != "/custom/config/wtg/config.yaml" {
+	if got := DefaultPath(); got != "/custom/config/wtg/config.toml" {
 		t.Errorf("DefaultPath: got %q", got)
 	}
 }
@@ -137,8 +140,87 @@ func TestDefaultPath_FallbackToHome(t *testing.T) {
 	if got == "" {
 		t.Error("DefaultPath should not be empty")
 	}
-	if filepath.Base(got) != "config.yaml" {
-		t.Errorf("DefaultPath should end in config.yaml, got %q", got)
+	if filepath.Base(got) != "config.toml" {
+		t.Errorf("DefaultPath should end in config.toml, got %q", got)
+	}
+}
+
+func TestLoad_TOMLFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	content := `[discovery]
+root_dir = "~/repos"
+max_depth = 4
+[git]
+branch_prefix = "me/"
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load TOML: %v", err)
+	}
+	if cfg.Discovery.MaxDepth != 4 {
+		t.Errorf("MaxDepth: got %d, want 4", cfg.Discovery.MaxDepth)
+	}
+	if cfg.Git.BranchPrefix != "me/" {
+		t.Errorf("BranchPrefix: got %q", cfg.Git.BranchPrefix)
+	}
+}
+
+func TestResolvePath(t *testing.T) {
+	// Explicit path wins unchanged.
+	if got := ResolvePath("/some/where.toml"); got != "/some/where.toml" {
+		t.Errorf("explicit: got %q", got)
+	}
+
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	wtgDir := filepath.Join(dir, "wtg")
+	if err := os.MkdirAll(wtgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	toml := filepath.Join(wtgDir, "config.toml")
+	yamlPath := filepath.Join(wtgDir, "config.yaml")
+
+	// Neither exists → default toml path.
+	if got := ResolvePath(""); got != toml {
+		t.Errorf("none: got %q, want %q", got, toml)
+	}
+	// Only yaml exists → legacy yaml.
+	if err := os.WriteFile(yamlPath, []byte("discovery:\n  max_depth: 9\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolvePath(""); got != yamlPath {
+		t.Errorf("legacy yaml: got %q, want %q", got, yamlPath)
+	}
+	// toml present → toml wins over yaml.
+	if err := os.WriteFile(toml, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolvePath(""); got != toml {
+		t.Errorf("toml precedence: got %q, want %q", got, toml)
+	}
+}
+
+func TestLoad_LegacyYAMLViaResolve(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	wtgDir := filepath.Join(dir, "wtg")
+	if err := os.MkdirAll(wtgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Only a legacy config.yaml exists; Load("") must find and parse it.
+	if err := os.WriteFile(filepath.Join(wtgDir, "config.yaml"), []byte("discovery:\n  max_depth: 6\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Discovery.MaxDepth != 6 {
+		t.Errorf("MaxDepth: got %d, want 6", cfg.Discovery.MaxDepth)
 	}
 }
 

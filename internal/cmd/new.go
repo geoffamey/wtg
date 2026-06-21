@@ -86,13 +86,6 @@ type SpaceNewArgs struct {
 // are also explicitly named in args.Repos (in which case they get a worktree).
 // Files listed in cfg.Always.Files are copied into the space root.
 func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out io.Writer) error {
-	if cfg.Spaces.RootDir == "" && args.Path == "" {
-		return fmt.Errorf("spaces.root_dir is not set; run `wtg init` or specify --path")
-	}
-	if cfg.Discovery.RootDir == "" {
-		return fmt.Errorf("discovery.root_dir is not set; run `wtg init` to configure")
-	}
-
 	branch := args.Branch
 	if branch == "" {
 		branch = cfg.Git.BranchPrefix + args.Name

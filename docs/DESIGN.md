@@ -313,20 +313,18 @@ default branch, and should be rebased/merged explicitly by the developer.
 When `wtg new` runs, it branches from the current HEAD of the local default branch.
 Users should run `repo sync` first to ensure they're branching from the latest upstream.
 
-## `wtg init`
+## `wtg config`
 
-`wtg init` is an interactive setup wizard that creates `~/.config/wtg/config.yaml` for
-new users. It prompts for:
+`wtg config` is the config command group. There is no interactive wizard: prompts
+can't offer shell completion and don't scale as the number of settings grows.
 
-- Discovery root to scan for git repositories
-- Max scan depth (default: 2)
-- Workspace root directory (where space directories will be created)
-- Optional branch name prefix (e.g. `yourname/`)
-- Optional always-included repos (symlinked into every new space)
-- Optional always-copied files (copied into every new space root)
-- Optional event script (`always.run`, executed after space changes)
+- `wtg config` (no subcommand) prints the resolved config file's raw contents.
+- `wtg config init` writes a commented TOML template at `~/.config/wtg/config.toml`,
+  with every setting shown commented out alongside its default. It refuses if the
+  target exists (`--force` overwrites); `-o PATH` redirects output and `-o -` writes
+  to stdout.
+- `wtg config path` prints the resolved config path (the existing `config.toml`, else
+  a legacy `config.yaml`, else the default `config.toml` path).
 
-When a config file already exists, its values are offered as prompt defaults so
-pressing enter on every prompt preserves the current configuration; the wizard
-confirms before overwriting. `--defaults` skips all prompts and accepts the
-factory defaults.
+Config is TOML-primary. Both TOML and YAML load: the parser is chosen by file
+extension, so a pre-existing `config.yaml` keeps working without migration.
