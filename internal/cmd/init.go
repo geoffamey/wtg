@@ -30,6 +30,9 @@ func InitCommand() *cli.Command {
   always.repos         repos symlinked into every new space
   always.files         files copied into every new space root
 
+The always.repos and always.files prompts take a comma-separated list on a
+single line; enter a single - to clear an existing value.
+
 If a config file already exists its values are offered as defaults, so pressing
 enter on every prompt preserves the current configuration.
 

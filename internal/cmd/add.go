@@ -25,7 +25,10 @@ func AddCommand(runner git.Runner) *cli.Command {
 		ArgsUsage: "<workspace> <repo>...",
 		Description: `Creates a new worktree for each specified repo inside an existing workspace,
 checking out the workspace's branch. Updates go.work automatically if the
-workspace already has one.`,
+workspace already has one.
+
+If the branch already exists in a repo (locally or on the remote) it is
+checked out as-is — no reset or rebase is performed.`,
 		ShellComplete: completeSpaceThenRepos,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {

@@ -30,7 +30,10 @@ repo, all on the same branch. A go.work file is written automatically when
 any of the included repos have a go.mod.
 
 At least one repo must be specified. If the branch already exists in a repo
-it is checked out as-is — no reset or rebase is performed.`,
+it is checked out as-is — no reset or rebase is performed.
+
+Any always.repos are symlinked into the workspace and any always.files are
+copied into its root.`,
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
