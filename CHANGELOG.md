@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `wtg push` skips symlinked repos instead of reporting an expected failure (the workspace branch never exists in the shared main clone)
+- `wtg exec` labels symlinked repos as `(symlink → main clone)` in the per-repo header so their output is clearly from the main clone
+
 ## [1.3.0] - 2026-06-21
 
 ### Added
