@@ -45,6 +45,10 @@ func RunSpacePush(runner git.Runner, spaceName string, out io.Writer) error {
 	var g errgroup.Group
 	for i, r := range sp.Repos {
 		g.Go(func() error {
+			if r.Symlink {
+				results[i] = opResult{r.Name, ui.SymWarn, "skipped (symlink)"}
+				return nil
+			}
 			if err := runner.Push(r.WorktreePath, sp.Branch); err != nil {
 				results[i] = opResult{r.Name, ui.SymFail, err.Error()}
 			} else {

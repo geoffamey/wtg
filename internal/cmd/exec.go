@@ -52,7 +52,11 @@ func RunSpaceExec(spaceName string, args []string, out io.Writer) error {
 		if i > 0 {
 			fmt.Fprintln(out)
 		}
-		fmt.Fprintf(out, "%s\n", ui.SectionHeader(r.Name))
+		hdr := r.Name
+		if r.Symlink {
+			hdr += ui.Muted.Render(" (symlink → main clone)")
+		}
+		fmt.Fprintf(out, "%s\n", ui.SectionHeader(hdr))
 		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 		cmd.Dir = r.WorktreePath
 		cmd.Stdout = out
