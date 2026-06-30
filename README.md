@@ -16,6 +16,13 @@ go install github.com/geoffamey/wtg@latest
 ```bash
 source <(wtg completion bash)
 wcd() { cd "$(wtg path "$1")"; }
+_wcd_completion() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local opts
+  opts=$(wtg path --generate-shell-completion 2>/dev/null | cut -d: -f1)
+  COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
+}
+complete -F _wcd_completion wcd
 ```
 
 **zsh** — add to `~/.zshrc`:
