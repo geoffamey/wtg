@@ -59,6 +59,7 @@ func RunSpaceExec(spaceName string, args []string, out io.Writer) error {
 		}
 		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 		cmd.Dir = r.WorktreePath
+		cmd.Stdin = os.Stdin
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Run(); err != nil {

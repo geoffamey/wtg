@@ -118,6 +118,34 @@ func TestRunSpaceExec_SkipsSymlinks(t *testing.T) {
 	}
 }
 
+func TestRunSpaceExec_PassesStdinThrough(t *testing.T) {
+	isolateState(t)
+	execSpace(t, "feat", []string{"api"})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	if _, err := w.WriteString("hello from stdin"); err != nil {
+		t.Fatalf("write pipe: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close pipe: %v", err)
+	}
+
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+
+	var out bytes.Buffer
+	if err := RunSpaceExec("feat", []string{"cat"}, &out); err != nil {
+		t.Fatalf("RunSpaceExec: %v", err)
+	}
+	if !strings.Contains(out.String(), "hello from stdin") {
+		t.Errorf("expected child to read piped stdin, got: %q", out.String())
+	}
+}
+
 func TestRunSpaceExec_RunsInWorktreeDir(t *testing.T) {
 	isolateState(t)
 	sp := execSpace(t, "feat", []string{"api"})
