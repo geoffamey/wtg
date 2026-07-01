@@ -54,6 +54,30 @@ func TestRunSpacePush_PushError(t *testing.T) {
 	}
 }
 
+func TestRunSpacePush_SkipsSymlinks(t *testing.T) {
+	isolateState(t)
+	spacePath := t.TempDir()
+	makeSpaceWithSymlink(t, "feat", "geoff/feat", spacePath, "/repos", "api", "shared")
+
+	var pushed []string
+	r := &testRunner{pushFn: func(repoPath, branch string) error {
+		pushed = append(pushed, repoPath)
+		return nil
+	}}
+
+	var out bytes.Buffer
+	if err := RunSpacePush(r, "feat", &out); err != nil {
+		t.Fatalf("RunSpacePush: %v", err)
+	}
+	if len(pushed) != 1 || !strings.Contains(pushed[0], "api") {
+		t.Errorf("expected push only for the worktree repo, got: %v", pushed)
+	}
+	got := out.String()
+	if !strings.Contains(got, "shared") || !strings.Contains(got, "skipped") {
+		t.Errorf("expected skip notice for symlink repo: %q", got)
+	}
+}
+
 func TestRunSpacePush_UnknownSpace(t *testing.T) {
 	isolateState(t)
 	var out bytes.Buffer
