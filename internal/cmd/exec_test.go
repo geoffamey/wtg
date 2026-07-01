@@ -92,6 +92,32 @@ func TestRunSpaceExec_UnknownSpace(t *testing.T) {
 	}
 }
 
+func TestRunSpaceExec_SkipsSymlinks(t *testing.T) {
+	isolateState(t)
+	sp := execSpace(t, "feat", []string{"api"})
+	sp.Repos = append(sp.Repos, state.RepoEntry{
+		Name:         "shared",
+		RepoPath:     "/repos/shared",
+		WorktreePath: "/nonexistent/shared", // never accessed if skipped correctly
+		Symlink:      true,
+	})
+	if err := state.Save(sp); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceExec("feat", []string{"echo", "hello"}, &out); err != nil {
+		t.Fatalf("RunSpaceExec: %v", err)
+	}
+	got := out.String()
+	if strings.Count(got, "hello") != 1 {
+		t.Errorf("expected 'hello' once (symlink repo skipped): %q", got)
+	}
+	if !strings.Contains(got, "shared") || !strings.Contains(got, "skipped") {
+		t.Errorf("expected skip notice for symlink repo: %q", got)
+	}
+}
+
 func TestRunSpaceExec_RunsInWorktreeDir(t *testing.T) {
 	isolateState(t)
 	sp := execSpace(t, "feat", []string{"api"})

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `wtg exec` and `wtg push` now skip repos that are symlinks from `always.repos` instead of running commands against them and failing confusingly (#35)
+
 ## [1.3.0] - 2026-06-21
 
 ### Added

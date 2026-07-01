@@ -53,6 +53,10 @@ func RunSpaceExec(spaceName string, args []string, out io.Writer) error {
 			fmt.Fprintln(out)
 		}
 		fmt.Fprintf(out, "%s\n", ui.SectionHeader(r.Name))
+		if r.Symlink {
+			fmt.Fprintf(out, "%s\n", ui.Warn.Render(ui.SymWarn+" skipped — symlink (always.repos)"))
+			continue
+		}
 		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 		cmd.Dir = r.WorktreePath
 		cmd.Stdout = out
