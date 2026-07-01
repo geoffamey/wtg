@@ -129,7 +129,9 @@ func TestRunSpaceExec_PassesStdinThrough(t *testing.T) {
 	if _, err := w.WriteString("hello from stdin"); err != nil {
 		t.Fatalf("write pipe: %v", err)
 	}
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatalf("close pipe: %v", err)
+	}
 
 	origStdin := os.Stdin
 	os.Stdin = r
