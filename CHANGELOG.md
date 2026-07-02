@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code plugin: install via `/plugin marketplace add geoffamey/wtg` and `/plugin install wtg@wtg` for `wtg`/`wtg-setup` skills that update with this repo
+
 ## [1.3.1] - 2026-07-01
 
 ### Fixed

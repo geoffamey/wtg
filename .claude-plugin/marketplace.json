@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "wtg",
+  "description": "Claude Code plugin for wtg multi-repo feature workspaces.",
+  "owner": {
+    "name": "Geoff Amey",
+    "url": "https://github.com/geoffamey"
+  },
+  "plugins": [
+    {
+      "name": "wtg",
+      "source": ".",
+      "description": "Install, configure, and work with wtg multi-repo feature workspaces.",
+      "category": "development"
+    }
+  ]
+}
