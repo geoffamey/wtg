@@ -46,6 +46,19 @@ end
 `cd` must run in the current shell it can't be a standalone command. The fish
 `complete` line gives `wcd` the same workspace-name tab completion as `wtg path`.
 
+### Claude Code plugin
+
+This repo is also a Claude Code plugin marketplace, bundling skills that teach
+Claude how to onboard (`wtg-setup`) and work inside a wtg workspace (`wtg`).
+Install it from the repo so it updates whenever this repo does:
+
+```
+/plugin marketplace add geoffamey/wtg
+/plugin install wtg@wtg
+```
+
+Use `/plugin` to manage or update it later.
+
 ## Configuration
 
 Run `wtg config init` to scaffold a commented config file at
