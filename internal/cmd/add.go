@@ -28,7 +28,9 @@ checking out the workspace's branch. Updates go.work automatically if the
 workspace already has one.
 
 If the branch already exists in a repo (locally or on the remote) it is
-checked out as-is — no reset or rebase is performed.`,
+checked out as-is — no reset or rebase is performed.
+
+Repos with a .wtginclude file copy listed local files into each new worktree.`,
 		ShellComplete: completeSpaceThenRepos,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 2 {
@@ -139,9 +141,19 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 			Undo: func(ctx context.Context) error { return os.Symlink(t.repoPath, t.worktreePath) },
 		})
 		steps = append(steps, worktreeStep(runner, t, sp.Branch, ""))
+		inc, err := includeCopySteps(t)
+		if err != nil {
+			return err
+		}
+		steps = append(steps, inc...)
 	}
 	for i := range newTargets {
 		steps = append(steps, worktreeStep(runner, newTargets[i], sp.Branch, ""))
+		inc, err := includeCopySteps(newTargets[i])
+		if err != nil {
+			return err
+		}
+		steps = append(steps, inc...)
 	}
 
 	goWorkPath := filepath.Join(sp.Path, "go.work")

@@ -110,6 +110,12 @@ space lifecycle events with the space context in `WTG_*` environment variables.
 See [docs/always.md](docs/always.md) for the full behaviour, the event/variable
 reference, and examples.
 
+### Per-repo `.wtginclude`
+
+Put a `.wtginclude` at a repo's root to copy local files from that clone into
+each new worktree when the repo is added via `wtg new` or `wtg add` (relative
+paths preserved). See [docs/wtginclude.md](docs/wtginclude.md).
+
 ## Quick start
 
 ```sh
@@ -130,7 +136,8 @@ wtg delete my-feature --delete-branch
 Create a workspace. At least one repo must be specified. For each repo, `wtg`
 creates or checks out a branch named `<branch_prefix><workspace>` as a linked
 worktree. A `go.work` file is written automatically for repos that have a
-`go.mod`.
+`go.mod`. If a repo has a [`.wtginclude`](docs/wtginclude.md), listed local
+files are copied from the main checkout into the new worktree.
 
 ```sh
 wtg new my-feature api payments frontend
