@@ -33,8 +33,8 @@ At least one repo must be specified. If the branch already exists in a repo
 it is checked out as-is — no reset or rebase is performed.
 
 Any always.repos are symlinked into the workspace, any always.files are copied
-into its root, and any always.run hook fires once the workspace is created.
-Repos with a .wtginclude file copy listed local files into each new worktree.`,
+into its root, always.secrets are seeded into each worktree when present in
+the source repo, and any always.run hook fires once the workspace is created.`,
 		ShellComplete: completeReposAfterFirst,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -86,8 +86,8 @@ type SpaceNewArgs struct {
 // Repos listed in cfg.Always.Repos are symlinked into the space unless they
 // are also explicitly named in args.Repos (in which case they get a worktree).
 // Files listed in cfg.Always.Files are copied into the space root.
-// Each worktree repo's .wtginclude (if present) seeds listed files from the
-// source checkout into the new worktree.
+// Paths in cfg.Always.Secrets are copied from each source repo into its
+// worktree when present.
 func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out io.Writer) error {
 	branch := args.Branch
 	if branch == "" {
@@ -150,11 +150,11 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 	}}
 	for i := range targets {
 		steps = append(steps, worktreeStep(runner, targets[i], branch, args.Base))
-		inc, err := includeCopySteps(targets[i])
+		sec, err := secretCopySteps(cfg, targets[i])
 		if err != nil {
 			return err
 		}
-		steps = append(steps, inc...)
+		steps = append(steps, sec...)
 	}
 	for i := range symlinkTargets {
 		steps = append(steps, symlinkStep(symlinkTargets[i]))

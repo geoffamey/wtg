@@ -1,18 +1,19 @@
-# `always`: shared repos, files, and event hooks
+# `always`: shared repos, files, secrets, and event hooks
 
 The `always` section of your config lets you say "every space should have these
-repos, these files, and run this script" once, instead of repeating it on every
-`wtg new`. It has three independent keys:
+repos, these files, these secrets, and run this script" once, instead of
+repeating it on every `wtg new`. It has four independent keys:
 
 ```yaml
 always:
   repos: [shared-tooling, protos]        # symlinked into every new space
   files: [~/.config/wtg/CLAUDE.md]       # copied into every new space root
+  secrets: [.env, config/local.env]      # copied into each worktree when present
   run: ~/.config/wtg/on-event            # executable run on lifecycle events
 ```
 
-All three are optional and can be used on their own. `~/` is expanded in
-`files` entries and in `run`.
+All four are optional and can be used on their own. `~/` is expanded in
+`files` entries and in `run` (not in `secrets`, which are repo-relative).
 
 ## `always.repos`
 
@@ -84,6 +85,40 @@ Notes:
 - Good fits: a `CLAUDE.md`/`AGENTS.md` template, `.envrc`, `.editorconfig`, a
   scratch `TODO.md`, a `justfile`. Anything you want present and editable per
   space.
+
+## `always.secrets`
+
+Relative paths looked up in each **source repo** and copied into that repo's
+**worktree** when the file exists. Use this for local files that live in your
+main clones but are not on the feature branch — `.env`, machine-local config,
+and similar.
+
+```yaml
+always:
+  secrets:
+    - .env
+    - config/local.env
+```
+
+```sh
+# In ~/repos/api:  .env exists
+# In ~/repos/docs: .env does not
+wtg new my-feature api docs
+# my-feature/
+#   api/.env         ← copy of ~/repos/api/.env
+#   docs/            ← no .env (missing in source; skipped)
+```
+
+Notes:
+
+- Paths are relative to the source repo root and preserved under the worktree
+  (no absolute paths, no `..`).
+- Missing files are skipped per repo; directories are a hard error.
+- Existing destination files are overwritten.
+- Symlinked `always.repos` are skipped (the symlink already points at the main
+  clone). Upgrading a symlink to a worktree with `wtg add` does apply secrets.
+- Unlike `always.files` (global absolute paths → space root), secrets are
+  repo-relative and land inside each worktree.
 
 ## `always.run`
 

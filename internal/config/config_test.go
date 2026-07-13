@@ -242,6 +242,7 @@ func TestLoad_AlwaysSection(t *testing.T) {
 always:
   repos: [docs, shared]
   files: [~/.config/wtg/CLAUDE.md]
+  secrets: [.env, config/local.env]
 `)
 	cfg, err := Load(path)
 	if err != nil {
@@ -258,6 +259,9 @@ always:
 	if cfg.Always.Files[0] != wantFile {
 		t.Errorf("Always.Files[0]: got %q, want %q", cfg.Always.Files[0], wantFile)
 	}
+	if len(cfg.Always.Secrets) != 2 || cfg.Always.Secrets[0] != ".env" || cfg.Always.Secrets[1] != "config/local.env" {
+		t.Errorf("Always.Secrets: got %v", cfg.Always.Secrets)
+	}
 }
 
 func TestLoad_AlwaysEmpty_ByDefault(t *testing.T) {
@@ -270,6 +274,9 @@ func TestLoad_AlwaysEmpty_ByDefault(t *testing.T) {
 	}
 	if len(cfg.Always.Files) != 0 {
 		t.Errorf("Always.Files should be empty by default, got %v", cfg.Always.Files)
+	}
+	if len(cfg.Always.Secrets) != 0 {
+		t.Errorf("Always.Secrets should be empty by default, got %v", cfg.Always.Secrets)
 	}
 }
 

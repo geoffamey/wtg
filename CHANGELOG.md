@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `.wtginclude` in a repo root lists local files to copy into each new worktree on `wtg new` / `wtg add` (see `docs/wtginclude.md`)
+- `always.secrets` config key — relative paths copied from each source repo into its worktree when present (see `docs/always.md`)
 - Claude Code plugin: install via `/plugin marketplace add geoffamey/wtg` and `/plugin install wtg@wtg` for `wtg`/`wtg-setup` skills that update with this repo
 
 ## [1.3.1] - 2026-07-01

@@ -407,9 +407,9 @@ func TestRunSpaceAdd_NonSymlinkAlreadyInSpace_Errors(t *testing.T) {
 	}
 }
 
-// --- .wtginclude ---
+// --- always.secrets ---
 
-func TestRunSpaceAdd_WtgInclude_CopiesIntoWorktree(t *testing.T) {
+func TestRunSpaceAdd_AlwaysSecrets_CopiesIntoWorktree(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -419,11 +419,11 @@ func TestRunSpaceAdd_WtgInclude_CopiesIntoWorktree(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(frontend, ".env"), []byte("FE=1\n"), 0o644); err != nil {
 		t.Fatalf("write .env: %v", err)
 	}
-	writeWtgInclude(t, frontend, ".env")
 
 	spacePath := filepath.Join(spacesRoot, "feat")
 	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
 	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{".env"}
 
 	var out bytes.Buffer
 	if err := RunSpaceAdd(cfg, createRunnerMkdir(), SpaceAddArgs{Name: "feat", Repos: []string{"frontend"}}, &out); err != nil {
@@ -440,7 +440,7 @@ func TestRunSpaceAdd_WtgInclude_CopiesIntoWorktree(t *testing.T) {
 	}
 }
 
-func TestRunSpaceAdd_WtgInclude_SymlinkUpgrade_CopiesIntoWorktree(t *testing.T) {
+func TestRunSpaceAdd_AlwaysSecrets_SymlinkUpgrade_CopiesIntoWorktree(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -450,18 +450,17 @@ func TestRunSpaceAdd_WtgInclude_SymlinkUpgrade_CopiesIntoWorktree(t *testing.T) 
 	if err := os.WriteFile(filepath.Join(docs, ".env"), []byte("DOCS=1\n"), 0o644); err != nil {
 		t.Fatalf("write .env: %v", err)
 	}
-	writeWtgInclude(t, docs, ".env")
 
 	spacePath := filepath.Join(spacesRoot, "feat")
 	if err := os.MkdirAll(spacePath, 0o755); err != nil {
 		t.Fatalf("mkdir space: %v", err)
 	}
-	// Pre-create the always.repos symlink as makeSpaceWithSymlink only writes state.
 	if err := os.Symlink(docs, filepath.Join(spacePath, "docs")); err != nil {
 		t.Fatalf("symlink docs: %v", err)
 	}
 	makeSpaceWithSymlink(t, "feat", "feat", spacePath, root, "api", "docs")
 	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{".env"}
 
 	var out bytes.Buffer
 	if err := RunSpaceAdd(cfg, createRunnerMkdir(), SpaceAddArgs{Name: "feat", Repos: []string{"docs"}}, &out); err != nil {

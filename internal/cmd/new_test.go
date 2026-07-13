@@ -39,7 +39,7 @@ func createRunner() *testRunner {
 }
 
 // createRunnerMkdir is like createRunner but creates the worktree directory so
-// filesystem copies (e.g. .wtginclude) can land under it.
+// filesystem copies (e.g. always.secrets) can land under it.
 func createRunnerMkdir() *testRunner {
 	return &testRunner{
 		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
@@ -954,17 +954,9 @@ func TestRunSpaceNew_AlwaysFiles_MissingSource_Errors(t *testing.T) {
 	}
 }
 
-// --- .wtginclude ---
+// --- always.secrets ---
 
-func writeWtgInclude(t *testing.T, repoPath string, lines ...string) {
-	t.Helper()
-	content := strings.Join(lines, "\n") + "\n"
-	if err := os.WriteFile(filepath.Join(repoPath, ".wtginclude"), []byte(content), 0o644); err != nil {
-		t.Fatalf("write .wtginclude: %v", err)
-	}
-}
-
-func TestRunSpaceNew_WtgInclude_CopiesIntoWorktree(t *testing.T) {
+func TestRunSpaceNew_AlwaysSecrets_CopiesWhenPresent(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -978,9 +970,9 @@ func TestRunSpaceNew_WtgInclude_CopiesIntoWorktree(t *testing.T) {
 	if err := os.WriteFile(src, []byte("SECRET=1\n"), 0o644); err != nil {
 		t.Fatalf("write src: %v", err)
 	}
-	writeWtgInclude(t, api, "config/local.env")
 
 	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{"config/local.env"}
 	var out bytes.Buffer
 	if err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
 		t.Fatalf("RunSpaceNew: %v", err)
@@ -996,35 +988,42 @@ func TestRunSpaceNew_WtgInclude_CopiesIntoWorktree(t *testing.T) {
 	}
 }
 
-func TestRunSpaceNew_WtgInclude_MissingFile_Errors(t *testing.T) {
-	root := t.TempDir()
-	spacesRoot := t.TempDir()
-	isolateState(t)
-	api := makeRepo(t, root, "api")
-	writeWtgInclude(t, api, "missing.env")
-
-	cfg := spaceCreateCfg(root, spacesRoot)
-	var out bytes.Buffer
-	err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
-	if err == nil {
-		t.Fatal("expected error when .wtginclude lists a missing file")
-	}
-}
-
-func TestRunSpaceNew_WtgInclude_AbsentFile_NoOp(t *testing.T) {
+func TestRunSpaceNew_AlwaysSecrets_MissingSkipped(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
 	makeRepo(t, root, "api")
 
 	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{"missing.env"}
 	var out bytes.Buffer
 	if err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
 		t.Fatalf("RunSpaceNew: %v", err)
 	}
 }
 
-func TestRunSpaceNew_WtgInclude_AlwaysRepoSymlink_Skipped(t *testing.T) {
+func TestRunSpaceNew_AlwaysSecrets_DirectoryErrors(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	api := makeRepo(t, root, "api")
+	if err := os.MkdirAll(filepath.Join(api, "secrets"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{"secrets"}
+	var out bytes.Buffer
+	err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when always.secrets points at a directory")
+	}
+	if !strings.Contains(err.Error(), "directory") {
+		t.Errorf("error should mention directory: %v", err)
+	}
+}
+
+func TestRunSpaceNew_AlwaysSecrets_AlwaysRepoSymlink_Skipped(t *testing.T) {
 	root := t.TempDir()
 	spacesRoot := t.TempDir()
 	isolateState(t)
@@ -1034,16 +1033,14 @@ func TestRunSpaceNew_WtgInclude_AlwaysRepoSymlink_Skipped(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(docs, "local.env"), []byte("DOCS=1\n"), 0o644); err != nil {
 		t.Fatalf("write docs local.env: %v", err)
 	}
-	writeWtgInclude(t, docs, "local.env")
 
 	cfg := alwaysCfg(root, spacesRoot, []string{"docs"})
+	cfg.Always.Secrets = []string{"local.env"}
 	var out bytes.Buffer
 	if err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
 		t.Fatalf("RunSpaceNew: %v", err)
 	}
 
-	// Symlink target is the main clone; there must be no separate copy under a
-	// worktree path distinct from the symlink (symlink IS the docs path).
 	docsLink := filepath.Join(spacesRoot, "feat", "docs")
 	fi, err := os.Lstat(docsLink)
 	if err != nil {
@@ -1051,14 +1048,5 @@ func TestRunSpaceNew_WtgInclude_AlwaysRepoSymlink_Skipped(t *testing.T) {
 	}
 	if fi.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("docs should remain a symlink")
-	}
-	// A mistaken copy would create docs as a directory; ensure no nested copy
-	// was attempted beside the symlink (symlink path itself is the entry).
-	if _, err := os.Stat(filepath.Join(docsLink, "local.env")); err == nil {
-		// Reading through the symlink sees the source file — that's fine.
-		// Ensure we did not replace the symlink with a directory containing a copy.
-		if fi.Mode()&os.ModeSymlink == 0 {
-			t.Error("docs symlink was replaced; .wtginclude should not run for always.repos")
-		}
 	}
 }

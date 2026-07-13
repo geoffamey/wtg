@@ -25,9 +25,10 @@ type Config struct {
 
 // AlwaysConfig lists repos and files that are automatically included in every new space.
 type AlwaysConfig struct {
-	Repos []string `koanf:"repos" yaml:"repos"` // symlinked into every new space
-	Files []string `koanf:"files" yaml:"files"` // copied into every new space root
-	Run   string   `koanf:"run"   yaml:"run"`   // executable run after space lifecycle events
+	Repos   []string `koanf:"repos"   yaml:"repos"`   // symlinked into every new space
+	Files   []string `koanf:"files"   yaml:"files"`   // copied into every new space root
+	Secrets []string `koanf:"secrets" yaml:"secrets"` // relative paths seeded into each worktree from the source repo
+	Run     string   `koanf:"run"     yaml:"run"`     // executable run after space lifecycle events
 }
 
 // DiscoveryConfig controls repo scanning.
