@@ -1,11 +1,11 @@
 ---
 name: wtg-setup
-description: Install, configure, and onboard a new user to wtg — a tool for managing multi-repo feature workspaces using git worktrees. Use when someone asks how to install wtg, set it up for the first time, or get started with the multi-repo workspace workflow. Invoke with /wtg-setup.
+description: Install, configure, and onboard a new user to wtg, a tool for managing multi-repo feature workspaces using git worktrees. Use when someone asks how to install wtg, set it up for the first time, revisit an existing setup, or get started with the multi-repo workspace workflow.
 ---
 
 # wtg (WorkTrees for Go) Setup
 
-Walk the user through installing and configuring wtg, then help them create a space CLAUDE.md template that gives their AI assistant context in every new workspace.
+Walk the user through installing and configuring wtg, then help them create space instruction templates that give their coding agent context in every new workspace.
 
 ## Re-running this skill
 
@@ -169,8 +169,9 @@ actually contains, deciding each together and uncommenting the ones they want to
 Bring the context the file can't know:
 
 - For wherever repos are discovered, use what the home-directory scan above told you.
-- Whichever setting copies files into each new space should point at the space CLAUDE.md
-  template you'll write in Step 6 (e.g. `~/.config/wtg/space-template/CLAUDE.md`).
+- Whichever setting copies files into each new space should point at the instruction
+  template or templates you'll write in Step 6 (for example,
+  `~/.config/wtg/space-template/AGENTS.md` and/or `CLAUDE.md`).
 - The setting that runs a script on space events is covered in Step 5a — ask the user
   before leaving it empty.
 - Ask whether they want a branch prefix, and what it should be.
@@ -222,15 +223,26 @@ That doc names every variable and its format and shows how to dispatch on the ev
 If the user isn't sure they want a hook, leave `always.run` unset — it's easy to add
 later by editing the config.
 
-## Step 6: Create the Space CLAUDE.md Template
+## Step 6: Create Space Instruction Templates
 
-Every new space gets a CLAUDE.md copied into its root (via the files setting from Step 5).
-Its job is small: announce that the directory is a wtg space so the `wtg` skill loads, and
-point at `/wtg`. The skill carries the wtg mechanics (what a space is, the commands, the
-read-only-symlink rule), so the CLAUDE.md must not restate them. Duplicating the skill
-just adds context cost to every session run in the space.
+Ask which coding agents the user wants each space to support: Claude Code, Codex, or both.
+Create the matching template files under a directory such as
+`~/.config/wtg/space-template/`, then include every template path in the `always.files`
+setting from Step 5.
 
-Keep it minimal. Start from this and resist adding more:
+- Claude Code reads `CLAUDE.md`.
+- Codex reads `AGENTS.md`.
+- For both, put the shared content in `AGENTS.md` and make `CLAUDE.md` import it with
+  `@AGENTS.md`. This avoids maintaining two copies.
+
+The instruction file's job is small: announce that the directory is a wtg space so the
+`wtg` skill loads, and make loading it a precondition for writing code or touching git.
+The skill carries the wtg mechanics (what a space is, the commands, the read-only-symlink
+rule, and the edit-in-the-space rule), so the instruction file must not restate them.
+Duplicating the skill adds context cost to every session run in the space.
+
+Use this shared content for `AGENTS.md`, or for `CLAUDE.md` when supporting Claude Code
+alone:
 
 ```markdown
 # Space
@@ -238,26 +250,28 @@ Keep it minimal. Start from this and resist adding more:
 This is a **wtg feature space** — a multi-repo workspace where each subdirectory is a git
 worktree of a different repo, all on the same branch.
 
-Use `/wtg` for working in the space.
+Before writing or editing any code, or running git, in this space, load the installed
+`wtg` workspace skill and follow it. It carries the rules for working across the space's
+worktrees.
 ```
 
-That wording trips the skill's trigger and directs to it; the skill takes over from there.
-Do not embed `wtg --help` output or a command list — that's the skill's job, and it
-drifts.
+That wording trips the skill's trigger and makes loading it a precondition for acting.
+The skill takes over from there. Do not embed `wtg --help` output, a command list, or the
+worktree rules themselves; those belong in the skill and drift over time.
 
 ### Optional space-specific additions
 
 Add only what neither the skill nor the user's existing instructions already cover. Ask
-what else Claude should know, but skip anything redundant — every line here loads on every
-session in the space:
+what else the coding agent should know, but skip anything redundant. Every line here
+loads in every session in the space:
 
 - **Team conventions** (PR title prefixes, PR template, issue tracker, build/test
-  commands): add these *only if* the user doesn't already keep them in a global CLAUDE.md
-  or similar that loads every session. If they do, don't copy them here.
+  commands): add these only if the user doesn't already keep them in a global instruction
+  file that loads every session. If they do, don't copy them here.
 - **Always-present repos**: if repos are symlinked into every space via the repos setting,
   a one-line note on which are read-only context can help.
 - **Space naming**: if spaces are named after tickets (e.g. `lin-123-thing`), a line
-  telling Claude to look the ticket up in their tracker gives it free context.
+  telling the coding agent to look the ticket up in their tracker gives it free context.
 
 One or two questions, not a checklist. Default to leaving things out unless they earn
 their place.

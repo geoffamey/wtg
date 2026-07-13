@@ -1,0 +1,27 @@
+{
+  "name": "wtg",
+  "version": "1.1.0",
+  "description": "Install, configure, and work with wtg multi-repo feature workspaces. Bundles wtg-setup onboarding and wtg workspace context.",
+  "author": {
+    "name": "Geoff Amey",
+    "url": "https://github.com/geoffamey"
+  },
+  "homepage": "https://github.com/geoffamey/wtg",
+  "repository": "https://github.com/geoffamey/wtg",
+  "license": "MIT",
+  "keywords": ["git", "worktree", "workspace", "multi-repo"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "wtg",
+    "shortDescription": "Manage multi-repo feature workspaces",
+    "longDescription": "Install and configure wtg, then work safely across coordinated git worktrees in multi-repo feature spaces.",
+    "developerName": "Geoff Amey",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write", "Shell"],
+    "websiteURL": "https://github.com/geoffamey/wtg",
+    "defaultPrompt": [
+      "Set up wtg for my repositories.",
+      "Help me work in this wtg feature space."
+    ]
+  }
+}

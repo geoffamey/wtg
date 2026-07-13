@@ -46,11 +46,12 @@ end
 `cd` must run in the current shell it can't be a standalone command. The fish
 `complete` line gives `wcd` the same workspace-name tab completion as `wtg path`.
 
-### Claude Code plugin
+### Coding-agent plugins
 
-This repo is also a Claude Code plugin marketplace, bundling skills that teach
-Claude how to onboard (`wtg-setup`) and work inside a wtg workspace (`wtg`).
-Install it from the repo so it updates whenever this repo does:
+This repo is a plugin marketplace for both Claude Code and Codex. Both plugins use the
+same `wtg-setup` and `wtg` skills from this repository.
+
+For Claude Code:
 
 ```
 /plugin marketplace add geoffamey/wtg
@@ -58,6 +59,23 @@ Install it from the repo so it updates whenever this repo does:
 ```
 
 Use `/plugin` to manage or update it later.
+
+For Codex:
+
+```sh
+codex plugin marketplace add geoffamey/wtg
+codex plugin add wtg@wtg
+```
+
+To refresh the Codex marketplace and reinstall the current plugin version:
+
+```sh
+codex plugin marketplace upgrade wtg
+codex plugin add wtg@wtg
+```
+
+Start a new Claude Code or Codex session after installing or updating so the refreshed
+skills are available.
 
 ## Configuration
 
