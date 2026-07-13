@@ -1,6 +1,6 @@
 ---
 name: wtg
-description: Use this skill whenever you are working inside a wtg workspace (space) — a directory where each subdirectory is a git worktree of a different repo, all on the same branch. Triggers when the space CLAUDE.md instructs you to use it, when the user asks about wtg commands or multi-repo operations, when you need to create or manage a workspace, or when you notice a go.work file alongside multiple git repo subdirectories. Use proactively — don't wait to be asked.
+description: Use this skill whenever you are working inside a wtg workspace (space), a directory where each subdirectory is a git worktree of a different repo, all on the same branch. Triggers when the space instruction file directs you to use it, when the user asks about wtg commands or multi-repo operations, when you need to create or manage a workspace, or when you notice a go.work file alongside multiple git repo subdirectories. Use proactively; don't wait to be asked.
 ---
 
 # wtg Workspace
@@ -10,6 +10,14 @@ A wtg space is a directory with one git worktree per repo, all sharing one branc
 
 **Symlinked subdirectories are read-only context repos** (pulled in via `always.repos`).
 Don't commit to or modify them unless the repo was added to the space with `wtg add`.
+
+**Edit inside the space, never in `~/repos`.** Each repo subdirectory here is a git
+worktree, and the same repo usually also has an ordinary checkout at `~/repos/<repo>` on a
+different branch. Read `~/repos` freely (e.g. to inspect a repo the space doesn't include),
+but make every edit — and run every git command — in the space's copy
+(`<space>/<repo>/`). Editing `~/repos/<repo>` silently lands your work on the wrong branch,
+in a worktree the space never sees. If you need to change a repo that isn't in the space
+yet, add it with `wtg add` first; do not reach into `~/repos` to edit it.
 
 All repos share the branch name, but each is pushed and PR'd independently: one PR per
 repo, coordinate the merges. wtg auto-writes a `go.work` at the space root when any repo
