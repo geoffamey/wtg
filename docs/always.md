@@ -93,11 +93,9 @@ Relative paths looked up in each **source repo** and copied into that repo's
 main clones but are not on the feature branch — `.env`, machine-local config,
 and similar.
 
-```yaml
-always:
-  secrets:
-    - .env
-    - config/local.env
+```toml
+[always]
+secrets = [".env", "config/local.env"]
 ```
 
 ```sh
