@@ -38,6 +38,21 @@ func createRunner() *testRunner {
 	}
 }
 
+// createRunnerMkdir is like createRunner but creates the worktree directory so
+// filesystem copies (e.g. always.secrets) can land under it.
+func createRunnerMkdir() *testRunner {
+	return &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
+			return os.MkdirAll(worktreePath, 0o755)
+		},
+		worktreeRemoveFn: func(_, worktreePath string, _ bool) error {
+			return os.RemoveAll(worktreePath)
+		},
+		branchDeleteFn: func(_, _ string, _ bool) error { return nil },
+	}
+}
+
 // newApp wraps NewCommand in a minimal parent app so Action can call cmd.Root().
 func newApp(runner git.Runner) *cli.Command {
 	return &cli.Command{
@@ -936,5 +951,102 @@ func TestRunSpaceNew_AlwaysFiles_MissingSource_Errors(t *testing.T) {
 	err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
 	if err == nil {
 		t.Fatal("expected error when always.files source is missing")
+	}
+}
+
+// --- always.secrets ---
+
+func TestRunSpaceNew_AlwaysSecrets_CopiesWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	api := makeRepo(t, root, "api")
+
+	cfgDir := filepath.Join(api, "config")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	src := filepath.Join(cfgDir, "local.env")
+	if err := os.WriteFile(src, []byte("SECRET=1\n"), 0o644); err != nil {
+		t.Fatalf("write src: %v", err)
+	}
+
+	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{"config/local.env"}
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+
+	dst := filepath.Join(spacesRoot, "feat", "api", "config", "local.env")
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("copied file not found: %v", err)
+	}
+	if string(data) != "SECRET=1\n" {
+		t.Errorf("copied content: got %q", string(data))
+	}
+}
+
+func TestRunSpaceNew_AlwaysSecrets_MissingSkipped(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+
+	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{"missing.env"}
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+}
+
+func TestRunSpaceNew_AlwaysSecrets_DirectoryErrors(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	api := makeRepo(t, root, "api")
+	if err := os.MkdirAll(filepath.Join(api, "secrets"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{"secrets"}
+	var out bytes.Buffer
+	err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when always.secrets points at a directory")
+	}
+	if !strings.Contains(err.Error(), "directory") {
+		t.Errorf("error should mention directory: %v", err)
+	}
+}
+
+func TestRunSpaceNew_AlwaysSecrets_AlwaysRepoSymlink_Skipped(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	docs := makeRepo(t, root, "docs")
+
+	if err := os.WriteFile(filepath.Join(docs, "local.env"), []byte("DOCS=1\n"), 0o644); err != nil {
+		t.Fatalf("write docs local.env: %v", err)
+	}
+
+	cfg := alwaysCfg(root, spacesRoot, []string{"docs"})
+	cfg.Always.Secrets = []string{"local.env"}
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, createRunnerMkdir(), SpaceNewArgs{Name: "feat", Repos: []string{"api"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+
+	docsLink := filepath.Join(spacesRoot, "feat", "docs")
+	fi, err := os.Lstat(docsLink)
+	if err != nil {
+		t.Fatalf("docs entry: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("docs should remain a symlink")
 	}
 }

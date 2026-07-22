@@ -406,3 +406,80 @@ func TestRunSpaceAdd_NonSymlinkAlreadyInSpace_Errors(t *testing.T) {
 		t.Errorf("error should mention already in space: %v", err)
 	}
 }
+
+// --- always.secrets ---
+
+func TestRunSpaceAdd_AlwaysSecrets_CopiesIntoWorktree(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	frontend := makeRepo(t, root, "frontend")
+
+	if err := os.WriteFile(filepath.Join(frontend, ".env"), []byte("FE=1\n"), 0o644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	spacePath := filepath.Join(spacesRoot, "feat")
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{".env"}
+
+	var out bytes.Buffer
+	if err := RunSpaceAdd(cfg, createRunnerMkdir(), SpaceAddArgs{Name: "feat", Repos: []string{"frontend"}}, &out); err != nil {
+		t.Fatalf("RunSpaceAdd: %v", err)
+	}
+
+	dst := filepath.Join(spacePath, "frontend", ".env")
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("copied file not found: %v", err)
+	}
+	if string(data) != "FE=1\n" {
+		t.Errorf("copied content: got %q", string(data))
+	}
+}
+
+func TestRunSpaceAdd_AlwaysSecrets_SymlinkUpgrade_CopiesIntoWorktree(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "api")
+	docs := makeRepo(t, root, "docs")
+
+	if err := os.WriteFile(filepath.Join(docs, ".env"), []byte("DOCS=1\n"), 0o644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	spacePath := filepath.Join(spacesRoot, "feat")
+	if err := os.MkdirAll(spacePath, 0o755); err != nil {
+		t.Fatalf("mkdir space: %v", err)
+	}
+	if err := os.Symlink(docs, filepath.Join(spacePath, "docs")); err != nil {
+		t.Fatalf("symlink docs: %v", err)
+	}
+	makeSpaceWithSymlink(t, "feat", "feat", spacePath, root, "api", "docs")
+	cfg := spaceCreateCfg(root, spacesRoot)
+	cfg.Always.Secrets = []string{".env"}
+
+	var out bytes.Buffer
+	if err := RunSpaceAdd(cfg, createRunnerMkdir(), SpaceAddArgs{Name: "feat", Repos: []string{"docs"}}, &out); err != nil {
+		t.Fatalf("RunSpaceAdd: %v", err)
+	}
+
+	dst := filepath.Join(spacePath, "docs", ".env")
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("copied file not found after upgrade: %v", err)
+	}
+	if string(data) != "DOCS=1\n" {
+		t.Errorf("copied content: got %q", string(data))
+	}
+	fi, err := os.Lstat(filepath.Join(spacePath, "docs"))
+	if err != nil {
+		t.Fatalf("lstat docs: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		t.Error("docs should be a worktree directory after upgrade, not a symlink")
+	}
+}

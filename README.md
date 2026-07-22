@@ -119,14 +119,16 @@ The optional `always` section applies the same setup to every new space:
 [always]
 repos = ["shared-tooling"]          # symlinked into every new space
 files = ["~/.config/wtg/CLAUDE.md"] # copied into every new space root
+secrets = [".env"]                  # copied into each worktree when present in the source repo
 run = "~/.config/wtg/on-event"      # executable run after create/add/remove/delete
 ```
 
 `always.repos` symlinks shared repos in (no feature-branch worktree),
-`always.files` seeds template files, and `always.run` invokes a hook script on
-space lifecycle events with the space context in `WTG_*` environment variables.
-See [docs/always.md](docs/always.md) for the full behaviour, the event/variable
-reference, and examples.
+`always.files` seeds template files into the space root, `always.secrets`
+copies listed local files from each source repo into its worktree when present,
+and `always.run` invokes a hook script on space lifecycle events with the space
+context in `WTG_*` environment variables. See [docs/always.md](docs/always.md)
+for the full behaviour, the event/variable reference, and examples.
 
 ## Quick start
 
@@ -148,7 +150,8 @@ wtg delete my-feature --delete-branch
 Create a workspace. At least one repo must be specified. For each repo, `wtg`
 creates or checks out a branch named `<branch_prefix><workspace>` as a linked
 worktree. A `go.work` file is written automatically for repos that have a
-`go.mod`.
+`go.mod`. Paths listed in `always.secrets` are copied from each source repo into
+its worktree when present (see [docs/always.md](docs/always.md)).
 
 ```sh
 wtg new my-feature api payments frontend

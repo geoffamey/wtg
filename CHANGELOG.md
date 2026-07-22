@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `always.secrets` config key — relative paths copied from each source repo into its worktree when present (see `docs/always.md`)
 - Claude Code and Codex plugins sharing the same `wtg` and `wtg-setup` skills
 - Agent-neutral workspace setup that supports `CLAUDE.md`, `AGENTS.md`, or both
 
