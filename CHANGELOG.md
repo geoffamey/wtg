@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-22
+
 ### Added
 
 - `always.secrets` config key — relative paths copied from each source repo into its worktree when present (see `docs/always.md`)
@@ -72,7 +74,8 @@ Initial public release.
 - XDG Base Directory-compliant config (`$XDG_CONFIG_HOME/wtg/config.yaml`) and state (`$XDG_DATA_HOME/wtg/spaces/`)
 - `--config` flag and `WTG_CONFIG` environment variable for config file override
 
-[Unreleased]: https://github.com/geoffamey/wtg/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/geoffamey/wtg/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/geoffamey/wtg/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/geoffamey/wtg/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/geoffamey/wtg/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/geoffamey/wtg/compare/v1.1.0...v1.2.0
