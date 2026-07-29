@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Narrow the `wtg` skill trigger to workspace management and multi-repo operations, excluding ordinary work inside existing worktrees
+
 ## [1.4.0] - 2026-07-22
 
 ### Added
