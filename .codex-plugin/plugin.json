@@ -1,6 +1,6 @@
 {
   "name": "wtg",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Install, configure, and work with wtg multi-repo feature workspaces. Bundles wtg-setup onboarding and wtg workspace context.",
   "author": {
     "name": "Geoff Amey",
