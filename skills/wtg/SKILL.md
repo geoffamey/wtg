@@ -1,6 +1,6 @@
 ---
 name: wtg
-description: Use this skill whenever you are working inside a wtg workspace (space), a directory where each subdirectory is a git worktree of a different repo, all on the same branch. Triggers when the space instruction file directs you to use it, when the user asks about wtg commands or multi-repo operations, when you need to create or manage a workspace, or when you notice a go.work file alongside multiple git repo subdirectories. Use proactively; don't wait to be asked.
+description: Use for wtg commands, workspace creation or management, adding or removing repos, and coordinated multi-repo workspace operations. Do not use merely because the current directory is an existing wtg workspace; ordinary code edits, tests, and Git commands inside existing worktrees do not require this skill.
 ---
 
 # wtg Workspace
