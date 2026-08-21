@@ -86,19 +86,25 @@ func RunSpaceRemove(cfg *config.Config, runner git.Runner, args SpaceRemoveArgs,
 		return fmt.Errorf("load space %q: %w", args.Name, err)
 	}
 
-	// Index existing repos by name for fast lookup.
+	// Index existing repos by name for fast lookup. Names are matched against
+	// the space's repos exactly or by a unique basename (see repoInSet).
+	stateNames := make([]string, 0, len(sp.Repos))
 	byName := make(map[string]state.RepoEntry, len(sp.Repos))
 	for _, r := range sp.Repos {
+		stateNames = append(stateNames, r.Name)
 		byName[r.Name] = r
 	}
 
 	var toRemove []state.RepoEntry
 	for _, name := range args.Repos {
-		r, ok := byName[name]
+		canonical, ok, err := repoInSet(stateNames, name)
+		if err != nil {
+			return err
+		}
 		if !ok {
 			return fmt.Errorf("repo %q is not in space %q", name, args.Name)
 		}
-		toRemove = append(toRemove, r)
+		toRemove = append(toRemove, byName[canonical])
 	}
 
 	if len(toRemove) == len(sp.Repos) {
@@ -154,6 +160,10 @@ func RunSpaceRemove(cfg *config.Config, runner git.Runner, args SpaceRemoveArgs,
 		tbl.Row(r.Name, sym+" "+msg)
 		if sym == ui.SymFail {
 			hadError = true
+		} else {
+			// The worktree is gone; prune the now-empty intermediate
+			// directories (e.g. the org/group level of a nested repo name).
+			removeEmptyParents(r.WorktreePath, sp.Path)
 		}
 	}
 	tbl.Flush()

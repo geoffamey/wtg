@@ -48,6 +48,49 @@ func TestRunSpaceRemove_RepoNotInSpace(t *testing.T) {
 	}
 }
 
+func TestRunSpaceRemove_Basename(t *testing.T) {
+	// Repos are stored under their canonical slash-separated name; a unique
+	// basename must address them for removal too.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	makeSpace(t, "feat", "feat", spacePath, []string{"org/api", "org/frontend"}, root)
+
+	var removed []string
+	r := removeRunner(cleanStatus)
+	r.worktreeRemoveFn = func(_, worktreePath string, _ bool) error {
+		removed = append(removed, worktreePath)
+		return nil
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"api"}}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceRemove: %v", err)
+	}
+	if len(removed) != 1 {
+		t.Fatalf("expected 1 worktree removed, got %d: %v", len(removed), removed)
+	}
+	if !strings.HasSuffix(removed[0], "org"+string(filepath.Separator)+"api") {
+		t.Errorf("expected org/api removed, got %q", removed[0])
+	}
+}
+
+func TestRunSpaceRemove_AmbiguousBasename_Errors(t *testing.T) {
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	makeSpace(t, "feat", "feat", spacePath, []string{"aaa/dup", "bbb/dup"}, root)
+
+	var out bytes.Buffer
+	err := RunSpaceRemove(&config.Config{}, &testRunner{}, SpaceRemoveArgs{Name: "feat", Repos: []string{"dup"}}, &bytes.Buffer{}, &out)
+	if err == nil {
+		t.Fatal("expected error for ambiguous repo name")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") || !strings.Contains(err.Error(), "aaa/dup") {
+		t.Errorf("error should mention ambiguity and candidates: %v", err)
+	}
+}
+
 func TestRunSpaceRemove_AllRepos_Rejected(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()

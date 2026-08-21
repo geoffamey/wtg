@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 
@@ -52,6 +53,23 @@ func completeSpaces(_ context.Context, cmd *cli.Command) {
 	emitFlags(cmd)
 }
 
+// completionName returns the name to offer for completion: the repo's
+// basename when it uniquely identifies the repo within names, otherwise the
+// full slash-separated path. This mirrors how repo names are resolved.
+func completionName(names []string, name string) string {
+	base := path.Base(name)
+	count := 0
+	for _, n := range names {
+		if path.Base(n) == base {
+			count++
+		}
+	}
+	if count == 1 {
+		return base
+	}
+	return name
+}
+
 // completeRepos outputs discovered repo names for shell completion.
 func completeRepos(_ context.Context, cmd *cli.Command) {
 	cfg, err := config.Load(cmd.Root().String("config"))
@@ -63,9 +81,13 @@ func completeRepos(_ context.Context, cmd *cli.Command) {
 		return
 	}
 	sort.Strings(paths)
-	for _, p := range paths {
-		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
-		fmt.Fprintln(os.Stdout, name)
+	names := make([]string, len(paths))
+	for i, p := range paths {
+		rel, _ := filepath.Rel(cfg.Discovery.RootDir, p)
+		names[i] = filepath.ToSlash(rel)
+	}
+	for _, n := range names {
+		fmt.Fprintln(os.Stdout, completionName(names, n))
 	}
 	emitFlags(cmd)
 }
@@ -113,8 +135,12 @@ func completeSpaceMembers(ctx context.Context, cmd *cli.Command) {
 		return
 	}
 	sort.Slice(sp.Repos, func(i, j int) bool { return sp.Repos[i].Name < sp.Repos[j].Name })
-	for _, r := range sp.Repos {
-		fmt.Println(r.Name)
+	names := make([]string, len(sp.Repos))
+	for i, r := range sp.Repos {
+		names[i] = r.Name
+	}
+	for _, n := range names {
+		fmt.Println(completionName(names, n))
 	}
 	emitFlags(cmd)
 }

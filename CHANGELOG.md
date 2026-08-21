@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Repos can be addressed by their unique basename (e.g. `dspictl` for `github.com/suhlig/dspictl`) in `wtg new`, `add`, `remove`, and `wtg repo` commands; ambiguous basenames error with the list of matching repos
+
 ### Changed
 
 - Narrow the `wtg` skill trigger to workspace management and multi-repo operations, excluding ordinary work inside existing worktrees
+
+### Fixed
+
+- `wtg delete` and `wtg remove` now prune the empty org/group directories left behind by nested repo worktrees, so the space root is removed without a "directory not empty" warning
 
 ## [1.4.0] - 2026-07-22
 
