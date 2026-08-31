@@ -70,20 +70,30 @@ func RunSpaceAdd(cfg *config.Config, runner git.Runner, args SpaceAddArgs, out i
 	}
 
 	// Partition requested repos into: upgrade from symlink, or add fresh.
+	// Names are matched against the space's existing repos exactly or by a
+	// unique basename, matching how they were added (see repoInSet).
+	stateNames := make([]string, 0, len(sp.Repos))
 	existingByName := make(map[string]state.RepoEntry, len(sp.Repos))
 	for _, r := range sp.Repos {
+		stateNames = append(stateNames, r.Name)
 		existingByName[r.Name] = r
 	}
 	var toUpgrade []state.RepoEntry // currently symlinks; will become worktrees
 	var toAdd []string              // repos not yet in the space
 	for _, name := range args.Repos {
-		r, ok := existingByName[name]
+		canonical, ok, err := repoInSet(stateNames, name)
+		if err != nil {
+			return err
+		}
 		if !ok {
 			toAdd = append(toAdd, name)
-		} else if r.Symlink {
+			continue
+		}
+		r := existingByName[canonical]
+		if r.Symlink {
 			toUpgrade = append(toUpgrade, r)
 		} else {
-			return fmt.Errorf("repo %q is already in space %q", name, args.Name)
+			return fmt.Errorf("repo %q is already in space %q", canonical, args.Name)
 		}
 	}
 

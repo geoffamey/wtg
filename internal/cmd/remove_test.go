@@ -48,6 +48,49 @@ func TestRunSpaceRemove_RepoNotInSpace(t *testing.T) {
 	}
 }
 
+func TestRunSpaceRemove_Basename(t *testing.T) {
+	// Repos are stored under their canonical slash-separated name; a unique
+	// basename must address them for removal too.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	makeSpace(t, "feat", "feat", spacePath, []string{"org/api", "org/frontend"}, root)
+
+	var removed []string
+	r := removeRunner(cleanStatus)
+	r.worktreeRemoveFn = func(_, worktreePath string, _ bool) error {
+		removed = append(removed, worktreePath)
+		return nil
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceRemove(&config.Config{}, r, SpaceRemoveArgs{Name: "feat", Repos: []string{"api"}}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceRemove: %v", err)
+	}
+	if len(removed) != 1 {
+		t.Fatalf("expected 1 worktree removed, got %d: %v", len(removed), removed)
+	}
+	if !strings.HasSuffix(removed[0], "org"+string(filepath.Separator)+"api") {
+		t.Errorf("expected org/api removed, got %q", removed[0])
+	}
+}
+
+func TestRunSpaceRemove_AmbiguousBasename_Errors(t *testing.T) {
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	makeSpace(t, "feat", "feat", spacePath, []string{"aaa/dup", "bbb/dup"}, root)
+
+	var out bytes.Buffer
+	err := RunSpaceRemove(&config.Config{}, &testRunner{}, SpaceRemoveArgs{Name: "feat", Repos: []string{"dup"}}, &bytes.Buffer{}, &out)
+	if err == nil {
+		t.Fatal("expected error for ambiguous repo name")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") || !strings.Contains(err.Error(), "aaa/dup") {
+		t.Errorf("error should mention ambiguity and candidates: %v", err)
+	}
+}
+
 func TestRunSpaceRemove_AllRepos_Rejected(t *testing.T) {
 	isolateState(t)
 	root := t.TempDir()
@@ -557,6 +600,75 @@ func TestRunSpaceRemove_AlwaysRepo_WorktreeRestoresSymlink(t *testing.T) {
 	}
 	if !docsEntry.Symlink {
 		t.Error("docs state entry should have Symlink: true after restore")
+	}
+}
+
+func TestRunSpaceRemove_AlwaysRepoNested_RestoresSymlink(t *testing.T) {
+	// Removing an upgraded nested always-repo restores the symlink even though
+	// the org/ parent dir is pruned before restoration. The always.repos entry
+	// may be configured by its full path or by its unique basename; both must
+	// match the canonical state name (org/docs) and keep the repo in state.
+	tests := []struct {
+		name       string
+		alwaysRepo string // cfg.Always.Repos entry
+		removeArg  string // repo argument passed to RunSpaceRemove
+	}{
+		{name: "full path", alwaysRepo: "org/docs", removeArg: "org/docs"},
+		{name: "basename", alwaysRepo: "docs", removeArg: "docs"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolateState(t)
+			root := t.TempDir()
+			spacePath := t.TempDir()
+			makeSpace(t, "feat", "feat", spacePath, []string{"api", "org/docs"}, root)
+
+			// Simulate the upgraded worktree on disk; the fake runner removes it
+			// like `git worktree remove` would, so removeEmptyParents prunes the
+			// now-empty org/ dir before the symlink restore.
+			worktree := filepath.Join(spacePath, "org", "docs")
+			if err := os.MkdirAll(worktree, 0o755); err != nil {
+				t.Fatalf("mkdir worktree: %v", err)
+			}
+			r := removeRunner(cleanStatus)
+			r.worktreeRemoveFn = func(_, wt string, _ bool) error {
+				return os.Remove(wt)
+			}
+
+			cfg := alwaysCfgRemove([]string{tt.alwaysRepo})
+			var out bytes.Buffer
+			if err := RunSpaceRemove(cfg, r, SpaceRemoveArgs{Name: "feat", Repos: []string{tt.removeArg}}, &bytes.Buffer{}, &out); err != nil {
+				t.Fatalf("RunSpaceRemove: %v", err)
+			}
+
+			// Symlink should be restored at docs' nested worktree path.
+			docsLink := filepath.Join(spacePath, "org", "docs")
+			target, err := os.Readlink(docsLink)
+			if err != nil {
+				t.Fatalf("docs symlink not restored: %v (out: %s)", err, out.String())
+			}
+			if want := filepath.Join(root, "org", "docs"); target != want {
+				t.Errorf("symlink target: got %q, want %q", target, want)
+			}
+
+			// State should retain docs as a symlink under its canonical name.
+			sp, err := state.Load("feat")
+			if err != nil {
+				t.Fatalf("state.Load: %v", err)
+			}
+			var docsEntry *state.RepoEntry
+			for i := range sp.Repos {
+				if sp.Repos[i].Name == "org/docs" {
+					docsEntry = &sp.Repos[i]
+				}
+			}
+			if docsEntry == nil {
+				t.Fatal("org/docs should remain in state as a symlink after removal")
+			}
+			if !docsEntry.Symlink {
+				t.Error("org/docs state entry should have Symlink: true after restore")
+			}
+		})
 	}
 }
 

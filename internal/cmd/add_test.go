@@ -407,6 +407,47 @@ func TestRunSpaceAdd_NonSymlinkAlreadyInSpace_Errors(t *testing.T) {
 	}
 }
 
+func TestRunSpaceAdd_Basename_AlreadyInSpace_Errors(t *testing.T) {
+	// The space stores the canonical slash-separated name; addressing the repo
+	// by its unique basename must still be recognized as already-in-space.
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "org/api")
+	spacePath := filepath.Join(spacesRoot, "feat")
+	makeSpace(t, "feat", "feat", spacePath, []string{"org/api"}, root)
+	cfg := spaceCreateCfg(root, spacesRoot)
+
+	var out bytes.Buffer
+	err := RunSpaceAdd(cfg, &testRunner{}, SpaceAddArgs{Name: "feat", Repos: []string{"api"}}, &out)
+	if err == nil {
+		t.Fatal("expected error when repo is already in space")
+	}
+	if !strings.Contains(err.Error(), "already in space") {
+		t.Errorf("error should mention already in space: %v", err)
+	}
+}
+
+func TestRunSpaceAdd_AmbiguousBasename_Errors(t *testing.T) {
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "aaa/dup")
+	makeRepo(t, root, "bbb/dup")
+	spacePath := filepath.Join(spacesRoot, "feat")
+	makeSpace(t, "feat", "feat", spacePath, []string{"api"}, root)
+	cfg := spaceCreateCfg(root, spacesRoot)
+
+	var out bytes.Buffer
+	err := RunSpaceAdd(cfg, &testRunner{}, SpaceAddArgs{Name: "feat", Repos: []string{"dup"}}, &out)
+	if err == nil {
+		t.Fatal("expected error for ambiguous repo name")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") || !strings.Contains(err.Error(), "aaa/dup") {
+		t.Errorf("error should mention ambiguity and candidates: %v", err)
+	}
+}
+
 // --- always.secrets ---
 
 func TestRunSpaceAdd_AlwaysSecrets_CopiesIntoWorktree(t *testing.T) {

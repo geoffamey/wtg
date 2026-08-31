@@ -190,35 +190,38 @@ func RunSpaceNew(cfg *config.Config, runner git.Runner, args SpaceNewArgs, out i
 // resolveAlwaysRepos builds symlink targets for cfg.Always.Repos, skipping any
 // repo that appears in explicitRepos (those will get a proper worktree instead).
 // Returns an error if any always-repo name is not found under the discovery root.
+// Repo names are matched exactly or by a unique basename (see repoInSet).
 func resolveAlwaysRepos(cfg *config.Config, spacePath string, allPaths, explicitRepos []string) ([]*repoTarget, error) {
 	if len(cfg.Always.Repos) == 0 {
 		return nil, nil
 	}
 
+	allNames, byName := repoNamesIndex(cfg.Discovery.RootDir, allPaths)
+
+	// Canonicalize the explicitly named repos so the always.repos inclusion can
+	// be skipped even when the two lists address the same repo differently
+	// (e.g. basename vs slash-separated path).
 	explicitSet := make(map[string]bool, len(explicitRepos))
 	for _, r := range explicitRepos {
 		explicitSet[r] = true
-	}
-
-	byName := make(map[string]string, len(allPaths))
-	for _, p := range allPaths {
-		name, _ := filepath.Rel(cfg.Discovery.RootDir, p)
-		byName[filepath.ToSlash(name)] = p
+		if canonical, ok, _ := repoInSet(allNames, r); ok {
+			explicitSet[canonical] = true
+		}
 	}
 
 	var out []*repoTarget
 	for _, name := range cfg.Always.Repos {
-		if explicitSet[name] {
+		canonical, err := resolveRepoName(cfg.Discovery.RootDir, allNames, name)
+		if err != nil {
+			return nil, fmt.Errorf("always.repos entry %q invalid: %w", name, err)
+		}
+		if explicitSet[canonical] {
 			continue
 		}
-		p, ok := byName[name]
-		if !ok {
-			return nil, fmt.Errorf("always.repos entry %q not found under %s", name, cfg.Discovery.RootDir)
-		}
 		out = append(out, &repoTarget{
-			name:         name,
-			repoPath:     p,
-			worktreePath: filepath.Join(spacePath, filepath.FromSlash(name)),
+			name:         canonical,
+			repoPath:     byName[canonical],
+			worktreePath: filepath.Join(spacePath, filepath.FromSlash(canonical)),
 			symlink:      true,
 		})
 	}

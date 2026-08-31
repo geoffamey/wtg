@@ -109,6 +109,12 @@ so an existing `config.yaml` keeps working.
 their default branch (`main`, `master`, etc.) and otherwise left untouched.
 `wtg` creates worktrees alongside them — it never modifies the main clones.
 
+Repos are addressed by their slash-separated path relative to
+`discovery.root_dir`, e.g. `github.com/suhlig/dspictl`. A repo nested under org
+or group directories can also be addressed by its basename (`dspictl`) as long
+as no other discovered repo shares that basename; otherwise `wtg` errors and
+lists the matching repos, and you use the full path to disambiguate.
+
 Override with `--config <path>` or the `WTG_CONFIG` environment variable.
 
 ### Always-included repos, files, and hooks

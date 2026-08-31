@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,40 +45,117 @@ func targetsFromState(sp *state.Space) []*repoTarget {
 	return targets
 }
 
-// buildTargets resolves the set of repos to include in a space.
+// buildTargets resolves the set of repos to include in a space. Each name is
+// matched against the discovered repos: an exact slash-separated path wins,
+// otherwise a unique basename match is accepted (see repoInSet).
 func buildTargets(rootDir, spacePath string, allPaths, names []string) ([]*repoTarget, error) {
+	allNames, byName := repoNamesIndex(rootDir, allPaths)
 	if len(names) == 0 {
-		targets := make([]*repoTarget, 0, len(allPaths))
-		for _, p := range allPaths {
-			name, _ := filepath.Rel(rootDir, p)
-			name = filepath.ToSlash(name)
+		targets := make([]*repoTarget, 0, len(allNames))
+		for _, name := range allNames {
 			targets = append(targets, &repoTarget{
 				name:         name,
-				repoPath:     p,
+				repoPath:     byName[name],
 				worktreePath: filepath.Join(spacePath, filepath.FromSlash(name)),
 			})
 		}
 		return targets, nil
 	}
 
-	byName := make(map[string]string, len(allPaths))
-	for _, p := range allPaths {
-		name, _ := filepath.Rel(rootDir, p)
-		byName[filepath.ToSlash(name)] = p
-	}
 	targets := make([]*repoTarget, 0, len(names))
-	for _, name := range names {
-		p, ok := byName[name]
-		if !ok {
-			return nil, fmt.Errorf("repo %q not found under %s", name, rootDir)
+	for _, input := range names {
+		name, err := resolveRepoName(rootDir, allNames, input)
+		if err != nil {
+			return nil, err
 		}
 		targets = append(targets, &repoTarget{
 			name:         name,
-			repoPath:     p,
+			repoPath:     byName[name],
 			worktreePath: filepath.Join(spacePath, filepath.FromSlash(name)),
 		})
 	}
 	return targets, nil
+}
+
+// ambiguousRepoError reports a repo name that matched more than one repo.
+type ambiguousRepoError struct {
+	input   string
+	matches []string
+}
+
+func (e *ambiguousRepoError) Error() string {
+	return fmt.Sprintf("repo name %q is ambiguous, matches: %s", e.input, strings.Join(e.matches, ", "))
+}
+
+// repoNamesIndex returns the discovered repos as canonical slash-separated
+// names (relative to rootDir) plus a name → absolute path index.
+func repoNamesIndex(rootDir string, allPaths []string) (names []string, byName map[string]string) {
+	byName = make(map[string]string, len(allPaths))
+	for _, p := range allPaths {
+		name, _ := filepath.Rel(rootDir, p)
+		name = filepath.ToSlash(name)
+		names = append(names, name)
+		byName[name] = p
+	}
+	return names, byName
+}
+
+// repoInSet resolves input against a set of slash-separated repo names. An
+// exact match wins; otherwise a unique match on the final path element (the
+// repo basename) is accepted, so repos nested under org/group directories can
+// be addressed by their short name. Multiple basename matches is an ambiguity
+// error listing the candidates.
+func repoInSet(names []string, input string) (canonical string, ok bool, err error) {
+	for _, n := range names {
+		if n == input {
+			return n, true, nil
+		}
+	}
+	var matches []string
+	for _, n := range names {
+		if path.Base(n) == input {
+			matches = append(matches, n)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return "", false, nil
+	case 1:
+		return matches[0], true, nil
+	default:
+		sort.Strings(matches)
+		return "", false, &ambiguousRepoError{input: input, matches: matches}
+	}
+}
+
+// resolveRepoName resolves input to its canonical name within names, mapping a
+// non-match to a not-found error scoped to the discovery root.
+func resolveRepoName(rootDir string, names []string, input string) (string, error) {
+	name, ok, err := repoInSet(names, input)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("repo %q not found under %s", input, rootDir)
+	}
+	return name, nil
+}
+
+// removeEmptyParents removes now-empty parent directories of path, walking up
+// until (but not including) stop. Directories that still contain files or
+// subdirectories are left untouched. This cleans up the intermediate
+// directories left behind when a nested (org/group) repo worktree is removed.
+func removeEmptyParents(path, stop string) {
+	stop = filepath.Clean(stop)
+	if stop == "" {
+		return
+	}
+	prefix := stop + string(filepath.Separator)
+	for dir := filepath.Dir(path); dir != stop && strings.HasPrefix(dir, prefix); dir = filepath.Dir(dir) {
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+	}
 }
 
 // classifyBranchTargets inspects the branch in each target repo and sets

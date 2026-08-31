@@ -112,3 +112,49 @@ func TestDiscoverRepoPaths_Empty(t *testing.T) {
 		t.Errorf("got %d paths, want 0", len(paths))
 	}
 }
+
+// --- resolveRepoPath ---
+
+func TestResolveRepoPath_ExactPath(t *testing.T) {
+	root := t.TempDir()
+	makeRepo(t, root, "github.com/suhlig/dspictl")
+	p, err := resolveRepoPath(root, 3, "github.com/suhlig/dspictl")
+	if err != nil {
+		t.Fatalf("resolveRepoPath: %v", err)
+	}
+	if !strings.HasSuffix(p, "github.com/suhlig/dspictl") {
+		t.Errorf("got %q", p)
+	}
+}
+
+func TestResolveRepoPath_UniqueBasename(t *testing.T) {
+	root := t.TempDir()
+	makeRepo(t, root, "github.com/suhlig/dspictl")
+	makeRepo(t, root, "github.com/speisehof/caterbill")
+	p, err := resolveRepoPath(root, 3, "dspictl")
+	if err != nil {
+		t.Fatalf("resolveRepoPath: %v", err)
+	}
+	if !strings.HasSuffix(p, "github.com/suhlig/dspictl") {
+		t.Errorf("got %q", p)
+	}
+}
+
+func TestResolveRepoPath_AmbiguousBasename(t *testing.T) {
+	root := t.TempDir()
+	makeRepo(t, root, "aaa/dup")
+	makeRepo(t, root, "bbb/dup")
+	_, err := resolveRepoPath(root, 3, "dup")
+	if err == nil || !strings.Contains(err.Error(), "ambiguous") {
+		t.Fatalf("expected ambiguous error, got %v", err)
+	}
+}
+
+func TestResolveRepoPath_Unknown(t *testing.T) {
+	root := t.TempDir()
+	makeRepo(t, root, "api")
+	_, err := resolveRepoPath(root, 2, "nope")
+	if err == nil || !strings.Contains(err.Error(), "not found under") {
+		t.Fatalf("expected not-found error, got %v", err)
+	}
+}

@@ -400,6 +400,67 @@ func TestRunSpaceNew_NamedRepos(t *testing.T) {
 	}
 }
 
+func TestRunSpaceNew_NestedRepoByBasename(t *testing.T) {
+	// A repo nested three levels under root can be addressed by its unique
+	// basename; the worktree still mirrors the canonical slash-separated path.
+	root := t.TempDir()
+	spacesRoot := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "github.com/suhlig/dspictl")
+	makeRepo(t, root, "github.com/speisehof/caterbill")
+	cfg := &config.Config{
+		Discovery: config.DiscoveryConfig{RootDir: root, MaxDepth: 3},
+		Spaces:    config.SpacesConfig{RootDir: spacesRoot},
+	}
+
+	var worktreePaths []string
+	r := &testRunner{
+		branchExistsFn: func(_, _ string) (bool, error) { return false, nil },
+		worktreeAddFn: func(_, worktreePath, _, _ string, _ bool) error {
+			worktreePaths = append(worktreePaths, worktreePath)
+			return nil
+		},
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceNew(cfg, r, SpaceNewArgs{Name: "feat", Repos: []string{"dspictl", "caterbill"}}, &out); err != nil {
+		t.Fatalf("RunSpaceNew: %v", err)
+	}
+	spaceRoot := filepath.Join(spacesRoot, "feat")
+	want := []string{
+		filepath.Join(spaceRoot, "github.com", "suhlig", "dspictl"),
+		filepath.Join(spaceRoot, "github.com", "speisehof", "caterbill"),
+	}
+	if len(worktreePaths) != len(want) {
+		t.Fatalf("got %d worktree paths, want %d: %v", len(worktreePaths), len(want), worktreePaths)
+	}
+	for i, got := range worktreePaths {
+		if got != want[i] {
+			t.Errorf("worktree[%d]: got %q, want %q", i, got, want[i])
+		}
+	}
+}
+
+func TestRunSpaceNew_AmbiguousBasename_Errors(t *testing.T) {
+	root := t.TempDir()
+	isolateState(t)
+	makeRepo(t, root, "aaa/dup")
+	makeRepo(t, root, "bbb/dup")
+	cfg := &config.Config{
+		Discovery: config.DiscoveryConfig{RootDir: root, MaxDepth: 3},
+		Spaces:    config.SpacesConfig{RootDir: t.TempDir()},
+	}
+
+	var out bytes.Buffer
+	err := RunSpaceNew(cfg, &testRunner{}, SpaceNewArgs{Name: "feat", Repos: []string{"dup"}}, &out)
+	if err == nil {
+		t.Fatal("expected error for ambiguous repo name")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") || !strings.Contains(err.Error(), "aaa/dup") {
+		t.Errorf("error should mention ambiguity and candidates: %v", err)
+	}
+}
+
 // --- saga rollback ---
 
 func TestRunSpaceNew_RollbackOnFailure(t *testing.T) {

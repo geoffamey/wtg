@@ -458,3 +458,38 @@ func TestRunSpaceDelete_AlwaysFiles_RemovedBeforeDirectoryDelete(t *testing.T) {
 		t.Errorf("space directory should be removable after always.files cleanup: %q", out.String())
 	}
 }
+
+func TestRunSpaceDelete_PrunesNestedWorktreeDirs(t *testing.T) {
+	// A repo whose short name contains slashes leaves org/group directories
+	// behind once its worktree is removed. Delete must prune those so the space
+	// root can be removed without a "directory not empty" warning.
+	isolateState(t)
+	root := t.TempDir()
+	spacePath := t.TempDir()
+	nested := filepath.Join(spacePath, "github.com", "suhlig", "dspictl")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	makeSpace(t, "feat", "feat", spacePath, []string{"github.com/suhlig/dspictl"}, root)
+
+	r := deleteRunner(cleanStatus)
+	// Simulate git worktree remove: only the leaf worktree dir disappears.
+	r.worktreeRemoveFn = func(_, worktreePath string, _ bool) error {
+		return os.Remove(worktreePath)
+	}
+
+	var out bytes.Buffer
+	if err := RunSpaceDelete(&config.Config{}, r, SpaceDeleteArgs{Name: "feat"}, &bytes.Buffer{}, &out); err != nil {
+		t.Fatalf("RunSpaceDelete: %v", err)
+	}
+	if strings.Contains(out.String(), "directory not empty") {
+		t.Errorf("space directory should be removable after pruning nested dirs: %q", out.String())
+	}
+	// Intermediate org/group dirs and the space root should all be gone.
+	if _, err := os.Stat(filepath.Join(spacePath, "github.com", "suhlig")); !os.IsNotExist(err) {
+		t.Errorf("expected nested dir to be pruned: %v", err)
+	}
+	if _, err := os.Stat(spacePath); !os.IsNotExist(err) {
+		t.Errorf("space root should be removed: %v", err)
+	}
+}

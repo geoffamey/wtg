@@ -123,6 +123,11 @@ func RunSpaceDelete(cfg *config.Config, runner git.Runner, args SpaceDeleteArgs,
 		tbl.Row(r.Name, sym+" "+msg)
 		if sym == ui.SymFail {
 			hadError = true
+		} else {
+			// The worktree is gone; prune the now-empty intermediate
+			// directories (e.g. the org/group level of a nested repo name) so
+			// the space root can be removed below.
+			removeEmptyParents(r.WorktreePath, sp.Path)
 		}
 	}
 	tbl.Flush()

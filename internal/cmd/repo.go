@@ -254,19 +254,31 @@ func syncOne(repoPath string, runner git.Runner) (string, string) {
 	return ui.SymUp, fmt.Sprintf("fast-forwarded to origin/%s (%d %s)", defaultBranch, n, commits)
 }
 
-// resolveRepoPath converts a short repo name to an absolute path, checking
-// that a git repo actually exists there.
-func resolveRepoPath(rootDir, name string) (string, error) {
+// resolveRepoPath converts a repo name to an absolute path, checking that a
+// git repo actually exists there. The name may be the full slash-separated
+// path relative to the discovery root or a unique basename (see repoInSet).
+func resolveRepoPath(rootDir string, maxDepth int, name string) (string, error) {
 	p := filepath.Join(rootDir, filepath.FromSlash(name))
-	if !isGitRepo(p) {
-		return "", fmt.Errorf("repo %q not found under %s", name, rootDir)
+	if isGitRepo(p) {
+		return p, nil
 	}
-	return p, nil
+	// Not a direct path — resolve through the discovered set, which also lets a
+	// unique basename address a repo nested under org/group directories.
+	allPaths, err := discoverRepoPaths(rootDir, maxDepth)
+	if err != nil {
+		return "", fmt.Errorf("scan %s: %w", rootDir, err)
+	}
+	names, byName := repoNamesIndex(rootDir, allPaths)
+	canonical, err := resolveRepoName(rootDir, names, name)
+	if err != nil {
+		return "", err
+	}
+	return byName[canonical], nil
 }
 
 // resolveRepoPaths returns paths for all repos to operate on. When args is
 // empty it discovers all repos under cfg.Discovery.RootDir (sorted); otherwise
-// it resolves each named arg to an absolute path.
+// it resolves each named arg to an absolute path (see resolveRepoPath).
 func resolveRepoPaths(cfg *config.Config, args []string) ([]string, error) {
 	if len(args) == 0 {
 		paths, err := discoverRepoPaths(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth)
@@ -278,7 +290,7 @@ func resolveRepoPaths(cfg *config.Config, args []string) ([]string, error) {
 	}
 	paths := make([]string, 0, len(args))
 	for _, name := range args {
-		p, err := resolveRepoPath(cfg.Discovery.RootDir, name)
+		p, err := resolveRepoPath(cfg.Discovery.RootDir, cfg.Discovery.MaxDepth, name)
 		if err != nil {
 			return nil, err
 		}

@@ -244,6 +244,9 @@ Examples:
 This eliminates any collision risk: two repos with the same leaf name but different org
 paths produce distinct worktree directories, matching the short name that identified them.
 
+When a worktree is removed (`wtg delete`, `wtg remove`, or a rollback), the now-empty
+org/group directories are pruned so the space root stays clean and removable.
+
 The default space root is `<spaces.root_dir>/<space-name>`. The `--path` flag on
 `wtg new` overrides this for the specific space being created; `wtg add` inherits
 the path stored in the space state.
