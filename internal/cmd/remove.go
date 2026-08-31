@@ -111,10 +111,19 @@ func RunSpaceRemove(cfg *config.Config, runner git.Runner, args SpaceRemoveArgs,
 		return fmt.Errorf("cannot remove all repos from space %q; use `wtg delete` instead", args.Name)
 	}
 
-	// Build the always.repos set for restore-symlink logic.
+	// Build the always.repos set for restore-symlink logic, canonicalizing each
+	// config entry against the space's repo names (exact or unique basename, see
+	// repoInSet) so e.g. a "docs" entry matches the stored name "org/docs".
+	// Entries that do not name a repo in this space are irrelevant and skipped.
 	alwaysRepos := make(map[string]bool, len(cfg.Always.Repos))
 	for _, name := range cfg.Always.Repos {
-		alwaysRepos[name] = true
+		canonical, ok, err := repoInSet(stateNames, name)
+		if err != nil {
+			return err
+		}
+		if ok {
+			alwaysRepos[canonical] = true
+		}
 	}
 
 	// Pre-flight: gather warnings about uncommitted or unpushed work.
@@ -187,6 +196,13 @@ func RunSpaceRemove(cfg *config.Config, runner git.Runner, args SpaceRemoveArgs,
 	// Restore symlinks for removed worktrees that are in always.repos.
 	for _, r := range toRemove {
 		if !r.Symlink && alwaysRepos[r.Name] {
+			// The worktree's parent dirs were pruned above (or never existed if
+			// the worktree was externally deleted); recreate them before
+			// symlinking, mirroring symlinkStep in workspace.go.
+			if err := os.MkdirAll(filepath.Dir(r.WorktreePath), 0o755); err != nil {
+				fmt.Fprintf(out, "  %s could not restore symlink for %s: %v\n", ui.SymWarn, r.Name, err)
+				continue
+			}
 			if err := os.Symlink(r.RepoPath, r.WorktreePath); err != nil {
 				fmt.Fprintf(out, "  %s could not restore symlink for %s: %v\n", ui.SymWarn, r.Name, err)
 				continue
