@@ -9,11 +9,11 @@ require (
 	github.com/knadh/koanf/providers/confmap v1.0.1
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
-	github.com/knadh/koanf/v2 v2.3.6
-	github.com/urfave/cli/v3 v3.11.0
-	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/mod v0.40.0
-	golang.org/x/sync v0.22.0
+	github.com/knadh/koanf/v2 v2.4.1
+	github.com/urfave/cli/v3 v3.14.0
+	go.yaml.in/yaml/v3 v3.0.6
+	golang.org/x/mod v0.42.0
+	golang.org/x/sync v0.23.0
 )
 
 require (
@@ -42,10 +42,10 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.35.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	gotest.tools/gotestsum v1.13.0 // indirect
 )
 
